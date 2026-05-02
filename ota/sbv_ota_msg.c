@@ -18,7 +18,9 @@ extern CRC_HandleTypeDef hcrc;
 #endif /*STM32F1xx*/
 #endif /* SBV_HW_CRC */
 
-#define SBV_OTA_MSG_TIMEOUT_MS      (100)
+#define SBV_OTA_MSG_TX_TIMEOUT_MS      (100)
+#define SBV_OTA_MSG_RX_TIMEOUT_MS      (100)
+
 #define SBV_OTA_NEXT_STATE(NS,T,ACK) \
     ((T) == sbv_ota_msg_tx_instance.max_retry) ? SBV_OTA_STATE_IDLE : \
         (((ACK)!=SBV_TRUE) ? SBV_OTA_STATE_IDLE : NS)
@@ -86,12 +88,12 @@ uint8_t sbv_ota_msg_rcv_buffer[SBV_OTA_PACKET_MAX_SIZE];
 extern sbv_event_group_handle_t sbv_ota_event_group;
 
 static int
-sbv_ota_msg_send (uint8_t *data, uint16_t length)
+sbv_ota_msg_send (uint8_t *data, uint16_t length, uint16_t timeout_ms)
 {
     if (sbv_ota_msg_hw_cb.sbv_ota_msg_send)
     {
         // When sending OTA msg via UART, the first parameters will be ignored
-        return (sbv_ota_msg_hw_cb.sbv_ota_msg_send) (SBV_CAN_MSG_OTA, data, length);
+        return (sbv_ota_msg_hw_cb.sbv_ota_msg_send) (SBV_CAN_MSG_OTA, data, length, timeout_ms);
     }
 
     return 0;
@@ -156,7 +158,7 @@ sbv_ota_msg_send_resp (uint8_t resp_type)
 	pkt_crc = sbv_ota_msg_crc_calculate((uint8_t *)&resp_pkt, sizeof(sbv_ota_resp_pkt_t));
     resp_pkt.crc = pkt_crc;
 
-    return sbv_ota_msg_send((uint8_t *)&resp_pkt, sizeof(sbv_ota_resp_pkt_t));
+    return sbv_ota_msg_send((uint8_t *)&resp_pkt, sizeof(sbv_ota_resp_pkt_t), SBV_OTA_MSG_TX_TIMEOUT_MS);
 }
 
 int
@@ -174,7 +176,7 @@ sbv_ota_msg_send_cmd (sbv_ota_cmd_t cmd_type)
 	pkt_crc = sbv_ota_msg_crc_calculate((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
     cmd_pkt.crc = pkt_crc;
 
-    return sbv_ota_msg_send((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
+    return sbv_ota_msg_send((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t), SBV_OTA_MSG_TX_TIMEOUT_MS);
 }
 
 int
@@ -202,7 +204,7 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info)
     pkt_crc = sbv_ota_msg_crc_calculate((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t));
     header_pkt.crc = pkt_crc;
 
-    return sbv_ota_msg_send((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t));
+    return sbv_ota_msg_send((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t), SBV_OTA_MSG_TX_TIMEOUT_MS);
 }
 
 int 
@@ -243,7 +245,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length)
         memcpy(data_pkt->data, data, pkt_data_length);
         data_pkt->crc           = sbv_ota_msg_crc_calculate((uint8_t *)data_pkt, pkt_length);
 
-        ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length);
+        ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length, SBV_OTA_MSG_TX_TIMEOUT_MS);
         if (ret < 0)
         {
             /* LOG */
@@ -322,7 +324,7 @@ void sbv_ota_state_start (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {
@@ -370,7 +372,7 @@ void sbv_ota_state_header (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {
@@ -417,7 +419,7 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {
@@ -462,7 +464,7 @@ void sbv_ota_state_end (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {

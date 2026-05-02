@@ -141,7 +141,7 @@ typedef struct sbv_ota_msg_tx_instance_t
 
 typedef struct sbv_ota_msg_hw_cb_t
 {
-  int (*sbv_ota_msg_send) (uint8_t, uint8_t *, uint16_t);
+  int (*sbv_ota_msg_send) (uint8_t, uint8_t *, uint16_t, uint16_t);
   int (*sbv_ota_reg_cb) (int (*rx_cb)(uint8_t *, const uint16_t));
   uint8_t* (*sbv_ota_rcv_data) (uint16_t, uint16_t);
 } sbv_ota_msg_hw_cb_t;

@@ -33,13 +33,13 @@ sbv_uart_init (void *uart_pin, sbv_uart_handle_t* uart_handle,
 }
 
 int
-sbv_uart_tx_send_data(uint8_t* uart_tx_data, uint16_t uart_tx_size)
+sbv_uart_tx_send_data(uint8_t* uart_tx_data, uint16_t uart_tx_size, uint16_t timeout_ms)
 {
     if (! sbv_uart_instance)
         return 0;
 
     if (sbv_uart_hw_cb.sbv_uart_tx_send_data)
-        return (sbv_uart_hw_cb.sbv_uart_tx_send_data) (sbv_uart_instance->uart_handle, uart_tx_data, uart_tx_size);
+        return (sbv_uart_hw_cb.sbv_uart_tx_send_data) (sbv_uart_instance->uart_handle, uart_tx_data, uart_tx_size, timeout_ms);
 
     return 0;
 }
@@ -64,9 +64,9 @@ sbv_uart_rx_read_data (uint8_t *data, int size)
 }
 
 void
-sbv_uart_send_debug (uint8_t *data, uint16_t data_length)
+sbv_uart_send_debug (uint8_t *data, uint16_t data_length, uint16_t timeout_ms)
 {
-    sbv_uart_tx_send_data (data, data_length);
+    sbv_uart_tx_send_data (data, data_length, timeout_ms);
 }
 
 int
@@ -79,13 +79,13 @@ sbv_uart_register_rx_cb (int (*uart_rx_cb)(uint8_t *, const uint16_t))
 }
 
 int
-sbv_uart_send_ota_data (uint8_t type, uint8_t* data, uint16_t length)
+sbv_uart_send_ota_data (uint8_t type, uint8_t* data, uint16_t length, uint16_t timeout_ms)
 {
     if (! sbv_uart_instance)
         return 0;
 
     if (sbv_uart_hw_cb.sbv_uart_tx_send_data)
-        return (sbv_uart_hw_cb.sbv_uart_tx_send_data) (sbv_uart_instance->uart_handle, data, length);
+        return (sbv_uart_hw_cb.sbv_uart_tx_send_data) (sbv_uart_instance->uart_handle, data, length, timeout_ms);
 
     return 0;
 }

@@ -150,9 +150,10 @@ sbv_task_balance_control(void *param)
 static void
 sbv_task_print_rx(uint8_t *data, uint8_t len)
 {
-    sbv_uart_tx_send_data((uint8_t *)"Received: ", 10);
-    sbv_uart_tx_send_data(data, len);
-    sbv_uart_tx_send_data((uint8_t *)"\r\n", 2);
+    uint16_t timeout_ms = 100;
+    sbv_uart_tx_send_data((uint8_t *)"Received: ", 10, timeout_ms);
+    sbv_uart_tx_send_data(data, len, timeout_ms);
+    sbv_uart_tx_send_data((uint8_t *)"\r\n", 2, timeout_ms);
 }
 
 

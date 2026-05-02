@@ -11,6 +11,8 @@
 #include "sbv_control_balance.h"
 #include "sbv_debug.h"
 
+#define SBV_DEBUG_TX_TIMEOUT_MS     (100)
+
 char rcv_command[7][5];
 sbv_debug_tx_t sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
 char tx_logging_buffer[100];
@@ -316,7 +318,7 @@ sbv_debug_tx_encoder(void)
             sbv_motor_read_encoder((sbv_control_balance.sbv_control_speed.motor_left.motor)),
             sbv_motor_read_encoder((sbv_control_balance.sbv_control_speed.motor_right.motor)));
 
-    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer));
+    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
 }
 
 static void
@@ -330,7 +332,7 @@ sbv_debug_tx_imu(void)
             sbv_control_balance.imu->phi.est_sensor,
             sbv_control_balance.imu->phi.est_post);
 
-    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer));
+    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
 }
 
 static void
@@ -365,7 +367,7 @@ sbv_debug_tx_pid(void)
             pid->target, pid->feedback, pid->output,
             pid->Kp, pid->Ki, pid->Kd);
 
-    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer));
+    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
 }
 
 void

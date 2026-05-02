@@ -63,7 +63,6 @@ sbv_uart_stm32f1xx_init (void *unused, sbv_uart_handle_t* uart_handle,
 
     sbv_uart_instance->uart_baudrate          = baudrate;
     sbv_uart_instance->uart_rx_notify_task    = NULL;
-    sbv_uart_instance->uart_tx_timeout        = sbv_rtos_ms_to_tick(SBV_UART_TX_TIMEOUT);
     // sbv_uart_instance->uart_rx_buffer_pos     = 0;
     sbv_uart_instance->uart_rx_isr_size       = 0;
 
@@ -84,14 +83,14 @@ ERR_EXIT:
 }
 
 static int
-sbv_uart_stm32f1xx_tx_send_pkt(sbv_uart_handle_t* uart_handle, uint8_t* uart_tx_buffer, uint16_t uart_tx_size)
+sbv_uart_stm32f1xx_tx_send_pkt(sbv_uart_handle_t* uart_handle, uint8_t* uart_tx_buffer, uint16_t uart_tx_size, uint16_t timeout_ms)
 {
     int ret = SBV_OK;
 
     if(! uart_handle || ! uart_tx_buffer)
         return SBV_ERROR;
 
-    ret = HAL_UART_Transmit(uart_handle, uart_tx_buffer, uart_tx_size, SBV_UART_TX_TIMEOUT);
+    ret = HAL_UART_Transmit(uart_handle, uart_tx_buffer, uart_tx_size, timeout_ms);
 
     return ret;
 }
@@ -121,7 +120,7 @@ sbv_uart_stm32f1xx_tx_packet_format(uint8_t* uart_tx_data, uint16_t uart_tx_size
 }
 
 int
-sbv_uart_stm32f1xx_send_data(sbv_uart_handle_t* uart_handle, uint8_t* uart_tx_data, uint16_t uart_tx_size)
+sbv_uart_stm32f1xx_send_data(sbv_uart_handle_t* uart_handle, uint8_t* uart_tx_data, uint16_t uart_tx_size, uint16_t timeout_ms)
 {
     int ret = SBV_OK, total_tx_bytes = 0, cur_tx_bytes = 0;
 
@@ -135,7 +134,7 @@ sbv_uart_stm32f1xx_send_data(sbv_uart_handle_t* uart_handle, uint8_t* uart_tx_da
         cur_tx_bytes = sbv_uart_stm32f1xx_tx_packet_format(uart_tx_data + total_tx_bytes,
                                                           (uart_tx_size - total_tx_bytes),
                                                           sbv_uart_instance->uart_tx_buffer);
-        ret = sbv_uart_stm32f1xx_tx_send_pkt(uart_handle, sbv_uart_instance->uart_tx_buffer, cur_tx_bytes);
+        ret = sbv_uart_stm32f1xx_tx_send_pkt(uart_handle, sbv_uart_instance->uart_tx_buffer, cur_tx_bytes, timeout_ms);
         if (ret != SBV_OK)
             continue;
         total_tx_bytes += cur_tx_bytes;
