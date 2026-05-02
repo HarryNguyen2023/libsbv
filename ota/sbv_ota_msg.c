@@ -185,7 +185,7 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info)
     sbv_ota_header_pkt_t header_pkt;
     uint32_t data_crc, pkt_crc;
 
-    if(!data)
+    if(! data || ! data_info)
         return -1;
 
     data_crc = sbv_ota_msg_crc_calculate((uint8_t *)data, data_info->fw_size);
@@ -259,6 +259,8 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length)
         }
     } while (total_length > 0);
 
+    return data_length;
+
 ERR:
     if(data_pkt)
     {
@@ -315,7 +317,7 @@ void sbv_ota_state_start (sbv_ota_state_t current_state, void *data)
     while (retry_time < sbv_ota_msg_tx_instance.max_retry)
     {
         sbv_ota_msg_tx_instance.is_ack = SBV_FALSE;
-        ret = sbv_ota_msg_send_cmd (SBV_OTA_STATE_START);
+        ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_START);
         if (ret < 0)
         {
             /* LOG */
@@ -535,7 +537,7 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
 {
     sbv_ota_header_pkt_t header_pkt;
     uint32_t pkt_crc, new_crc;
-    int ret, pkg_size;
+    int ret;
 
     if(! data || ! data_length)
         return SBV_ERROR;
@@ -549,13 +551,13 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
         goto ERR_EXIT;
     }
 
-    if((pkg_size = sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue)) < sizeof(sbv_ota_header_pkt_t))
+    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < sizeof(sbv_ota_header_pkt_t))
     {
         sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
         return SBV_BUSY;
     }
 
-    sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &header_pkt, pkg_size);
+    sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &header_pkt, sizeof(sbv_ota_header_pkt_t));
     if((header_pkt.sof != SBV_OTA_SOF) || (header_pkt.eof != SBV_OTA_EOF))
         goto ERR_EXIT;
 
@@ -564,7 +566,7 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
 
     pkt_crc         = header_pkt.crc;
     header_pkt.crc  = 0;
-    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)&header_pkt, pkg_size);
+    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t));
     if(pkt_crc != new_crc)
     {
         /* LOG */
@@ -663,6 +665,8 @@ sbv_ota_msg_rx_handle(uint8_t *data, const uint16_t data_length)
 
     switch (sbv_ota_msg_rx_instance.rx_state)
     {
+    // Intend to allow the code to move through the IDLE state right
+    // to the START state when the received OTA msg from peer
     case SBV_OTA_STATE_IDLE:
         sbv_ota_msg_rx_instance.rx_state = SBV_OTA_STATE_START;
     case SBV_OTA_STATE_START:

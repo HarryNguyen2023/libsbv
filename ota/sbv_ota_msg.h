@@ -13,7 +13,7 @@
 #define SBV_OTA_DATA_OVERHEAD     (6)
 #define SBV_OTA_PACKET_MAX_SIZE   (SBV_OTA_DATA_MAX_SIZE + SBV_OTA_DATA_OVERHEAD)
 
-typedef sbv_ota_fw_metadata_t;
+typedef struct sbv_ota_fw_metadata_t sbv_ota_fw_metadata_t;
 
 /* State of the OTA process FSM */
 typedef enum sbv_ota_state_t
