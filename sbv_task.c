@@ -190,13 +190,14 @@ sbv_task_uart_rx_cb (uint8_t *data, const uint16_t size)
 void
 sbv_task_uart_rx_task(void *param)
 {
-    uint16_t rcv_data_size = 0;
+    uint16_t rcv_data_size  = 0;
+    uint16_t timeout_ms     = 100;
 
     /* Register callback function to handle UART rx */
     sbv_uart_register_rx_cb (sbv_task_uart_rx_cb);
     for(;;)
     {
-        sbv_uart_rx_rcv_data (&rcv_data_size);
+        sbv_uart_rx_rcv_data (&rcv_data_size, timeout_ms);
     }
 }
 

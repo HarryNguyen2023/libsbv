@@ -40,7 +40,7 @@ struct sbv_uart_hw_cb_t
 {
     void (*sbv_uart_init) (void *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t);
     int (*sbv_uart_tx_send_data) (sbv_uart_handle_t *, uint8_t *, uint16_t);
-    uint8_t* (*sbv_uart_rx_rcv_data) (uint16_t *);
+    uint8_t* (*sbv_uart_rx_rcv_data) (uint16_t *, uint16_t);
     int (*sbv_uart_rx_read_data) (uint8_t *, int);
     int (*sbv_uart_register_rx_cb) (int (*uart_rx_cb)(uint8_t *, const uint16_t));
 };
@@ -51,7 +51,7 @@ sbv_uart_init (void *uart_pin, sbv_uart_handle_t* uart_handle,
 int
 sbv_uart_tx_send_data(uint8_t* uart_tx_data, uint16_t uart_tx_size);
 uint8_t *
-sbv_uart_rx_rcv_data (uint16_t *size);
+sbv_uart_rx_rcv_data (uint16_t *size, uint16_t timeout_ms);
 int
 sbv_uart_rx_read_data (uint8_t *data, int size);
 void

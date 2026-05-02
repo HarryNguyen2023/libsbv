@@ -18,6 +18,7 @@ extern CRC_HandleTypeDef hcrc;
 #endif /*STM32F1xx*/
 #endif /* SBV_HW_CRC */
 
+#define SBV_OTA_MSG_TIMEOUT_MS      (100)
 #define SBV_OTA_NEXT_STATE(NS,T,ACK) \
     ((T) == sbv_ota_msg_tx_instance.max_retry) ? SBV_OTA_STATE_IDLE : \
         (((ACK)!=SBV_TRUE) ? SBV_OTA_STATE_IDLE : NS)
@@ -31,7 +32,7 @@ sbv_ota_msg_hw_cb_t sbv_ota_msg_hw_cb = {
 #ifdef SBV_OTA_UART
     .sbv_ota_msg_send = sbv_uart_send_ota_data,
     .sbv_ota_reg_cb   = sbv_uart_register_rx_cb,
-    .sbv_ota_rcv_data = sbv_uart_stm32f1xx_rcv_data,
+    .sbv_ota_rcv_data = sbv_uart_rx_rcv_data,
 #endif /* SBV_OTA_UART */
 };
 
@@ -89,6 +90,7 @@ sbv_ota_msg_send (uint8_t *data, uint16_t length)
 {
     if (sbv_ota_msg_hw_cb.sbv_ota_msg_send)
     {
+        // When sending OTA msg via UART, the first parameters will be ignored
         return (sbv_ota_msg_hw_cb.sbv_ota_msg_send) (SBV_CAN_MSG_OTA, data, length);
     }
 
@@ -96,11 +98,11 @@ sbv_ota_msg_send (uint8_t *data, uint16_t length)
 }
 
 static uint8_t*
-sbv_ota_msg_rcv (uint16_t length)
+sbv_ota_msg_rcv (uint16_t length, uint16_t timeout_ms)
 {
     if (sbv_ota_msg_hw_cb.sbv_ota_rcv_data)
     {
-        return (sbv_ota_msg_hw_cb.sbv_ota_rcv_data) (length);
+        return (sbv_ota_msg_hw_cb.sbv_ota_rcv_data) (length, timeout_ms);
     }
 
     return 0;
@@ -320,7 +322,7 @@ void sbv_ota_state_start (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {
@@ -368,7 +370,7 @@ void sbv_ota_state_header (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {
@@ -415,7 +417,7 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {
@@ -460,7 +462,7 @@ void sbv_ota_state_end (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length);
+        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_TIMEOUT_MS);
         if (! buff || ! data_length
             || ! (sbv_ota_msg_tx_instance.is_ack))
         {

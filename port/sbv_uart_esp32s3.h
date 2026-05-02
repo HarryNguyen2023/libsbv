@@ -23,7 +23,6 @@ typedef struct sbv_uart_instance_t
     sbv_uart_dma_handle_t*  uart_rx_dma_handle;
     sbv_uart_baudrate_t     uart_baudrate;
     sbv_rtos_task_handle_t  uart_rx_notify_task;
-    sbv_rtos_tick_type_t    uart_rx_timeout;
     sbv_rtos_tick_type_t    uart_tx_timeout;
     uint16_t                uart_rx_buffer_pos;
     uint16_t                uart_rx_isr_size;
@@ -58,6 +57,6 @@ sbv_uart_esp32s3_init(sbv_gpio_num_t uart_pin[2], sbv_uart_handle_t* uart_port,
 int
 sbv_uart_esp32s3_send_data(sbv_uart_handle_t* uart_handle, uint8_t* uart_tx_data, uint16_t uart_tx_size);
 uint8_t *
-sbv_uart_esp32s3_rcv_data (uint16_t *size);
+sbv_uart_esp32s3_rcv_data (uint16_t *size, uint16_t timeout_ms);
 #endif /* ESP32xx_IDF */
 #endif /* __SBV_UART_ESP32S3_H__ */

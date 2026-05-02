@@ -45,10 +45,10 @@ sbv_uart_tx_send_data(uint8_t* uart_tx_data, uint16_t uart_tx_size)
 }
 
 uint8_t *
-sbv_uart_rx_rcv_data (uint16_t *size)
+sbv_uart_rx_rcv_data (uint16_t *size, uint16_t timeout_ms)
 {
     if (sbv_uart_hw_cb.sbv_uart_rx_rcv_data)
-        return (sbv_uart_hw_cb.sbv_uart_rx_rcv_data) (size);
+        return (sbv_uart_hw_cb.sbv_uart_rx_rcv_data) (size, timeout_ms);
 
     *size = 0;
     return NULL;

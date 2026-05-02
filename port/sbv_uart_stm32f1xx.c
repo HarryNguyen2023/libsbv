@@ -63,7 +63,6 @@ sbv_uart_stm32f1xx_init (void *unused, sbv_uart_handle_t* uart_handle,
 
     sbv_uart_instance->uart_baudrate          = baudrate;
     sbv_uart_instance->uart_rx_notify_task    = NULL;
-    sbv_uart_instance->uart_rx_timeout        = sbv_rtos_ms_to_tick(SBV_UART_RX_TIMEOUT);
     sbv_uart_instance->uart_tx_timeout        = sbv_rtos_ms_to_tick(SBV_UART_TX_TIMEOUT);
     // sbv_uart_instance->uart_rx_buffer_pos     = 0;
     sbv_uart_instance->uart_rx_isr_size       = 0;
@@ -165,7 +164,7 @@ sbv_uart_stm32f1xx_rx_hw_callback(sbv_uart_handle_t* uart_handle, uint16_t uart_
 }
 
 uint8_t *
-sbv_uart_stm32f1xx_rcv_data (uint16_t *size)
+sbv_uart_stm32f1xx_rcv_data (uint16_t *size, uint16_t timeout_ms)
 {
     uint8_t* rx_buffer_cur_pos;
     uint8_t* rx_buffer_ret_pos;
@@ -176,7 +175,7 @@ sbv_uart_stm32f1xx_rcv_data (uint16_t *size)
     if (! sbv_uart_instance)
         return NULL;
 
-    tick_to_wait = sbv_uart_instance->uart_rx_timeout;
+    tick_to_wait = sbv_rtos_ms_to_tick(timeout_ms);
 
     SBV_UART_RX_BUFFER_MUTEX_LOCK;
 

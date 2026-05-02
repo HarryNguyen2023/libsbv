@@ -49,7 +49,6 @@ sbv_uart_esp32s3_instance_init(sbv_uart_handle_t* uart_handle, sbv_uart_dma_hand
 
     sbv_uart_instance.uart_baudrate          = baudrate;
     sbv_uart_instance.uart_rx_notify_task    = NULL;
-    sbv_uart_instance.uart_rx_timeout        = sbv_rtos_ms_to_tick(SBV_UART_RX_TIMEOUT);
     sbv_uart_instance.uart_tx_timeout        = sbv_rtos_ms_to_tick(SBV_UART_TX_TIMEOUT);
     sbv_uart_instance.uart_rx_buffer_pos     = 0;
     sbv_uart_instance.uart_rx_isr_size       = 0;
@@ -204,11 +203,11 @@ void IRAM_ATTR sbv_uart_esp32s3_rx_hw_callback (void *arg)
 }
 
 uint8_t *
-sbv_uart_esp32s3_rcv_data (uint16_t *size)
+sbv_uart_esp32s3_rcv_data (uint16_t *size, uint16_t timeout_ms)
 {
     sbv_rtos_tick_type_t tick_to_wait;
 
-    tick_to_wait = sbv_uart_instance.uart_rx_timeout;
+    tick_to_wait = sbv_rtos_ms_to_tick(timeout_ms);
 
     SBV_UART_RX_BUFFER_MUTEX_LOCK;
 
