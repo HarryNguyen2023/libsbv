@@ -211,54 +211,45 @@ int
 sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length)
 {
     sbv_ota_data_pkt_t *data_pkt = NULL;
-    int32_t total_length = data_length;
     uint32_t pkt_length;
-    uint32_t pkt_data_length;
     int ret;
 
     if(! data || ! data_length)
         return -1;
 
-    do
+
+    if(data_length > SBV_OTA_DATA_MAX_SIZE)
     {
-        if(total_length > SBV_OTA_DATA_MAX_SIZE)
-        {
-            pkt_data_length = SBV_OTA_DATA_MAX_SIZE;
-            total_length    -= SBV_OTA_DATA_MAX_SIZE;
-        }
-        else
-        {
-            pkt_data_length = total_length;
-            total_length    = 0;
-        }
-        pkt_length = sizeof(sbv_ota_data_pkt_t) + pkt_data_length;
-        data_pkt   = sbv_rtos_malloc(pkt_length);
-        if(! data_pkt)
-        {
-            /* LOG */
-            return -1;
-        }
+        /* LOG */
+        return -1;
+    }
 
-        data_pkt->sof           = SBV_OTA_SOF;
-        data_pkt->packet_type   = SBV_OTA_PACKET_TYPE_DATA;
-        data_pkt->crc           = 0;
-        memcpy(data_pkt->data, data, pkt_data_length);
-        data                    += pkt_data_length;
-        data_pkt->crc           = sbv_ota_msg_crc_calculate((uint8_t *)data_pkt, pkt_length);
+    pkt_length = sizeof(sbv_ota_data_pkt_t) + data_length;
+    data_pkt   = sbv_rtos_malloc(pkt_length);
+    if(! data_pkt)
+    {
+        /* LOG */
+        return -1;
+    }
 
-        ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length, SBV_OTA_MSG_TX_TIMEOUT_MS);
-        if (ret < 0)
-        {
-            /* LOG */
-            goto ERR;
-        }
+    data_pkt->sof           = SBV_OTA_SOF;
+    data_pkt->packet_type   = SBV_OTA_PACKET_TYPE_DATA;
+    data_pkt->crc           = 0;
+    memcpy(data_pkt->data, data, data_length);
+    data_pkt->crc           = sbv_ota_msg_crc_calculate((uint8_t *)data_pkt, pkt_length);
 
-        if(data_pkt)
-        {
-            sbv_rtos_free(data_pkt);
-            data_pkt = NULL;
-        }
-    } while (total_length > 0);
+    ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length, SBV_OTA_MSG_TX_TIMEOUT_MS);
+    if (ret < 0)
+    {
+        /* LOG */
+        goto ERR;
+    }
+
+    if(data_pkt)
+    {
+        sbv_rtos_free(data_pkt);
+        data_pkt = NULL;
+    }
 
     return data_length;
 
@@ -399,7 +390,7 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
 {
     int ret;
     uint8_t *buff, retry_time, *images;
-    uint16_t data_length, image_length;
+    uint16_t data_length, image_length, chunk_length;
 
     if (current_state != SBV_OTA_STATE_HEADER)
     {
@@ -409,31 +400,39 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
 
     // Read the images from the filesystem
 
-    retry_time = 0;
-    while (retry_time < sbv_ota_msg_tx_instance.max_retry)
+    while (image_length >= 0)
     {
-        sbv_ota_msg_tx_instance.is_ack = SBV_FALSE;
-        ret = sbv_ota_msg_send_data_frame (images, image_length);
-        if (ret < 0)
-        {
-            /* LOG */
-            retry_time++;
-            continue;
-        }
+        chunk_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? SBV_OTA_DATA_MAX_SIZE : image_length;
+        image_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? (image_length - SBV_OTA_DATA_MAX_SIZE) : 0;
 
-        /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
-        if (! buff || ! data_length
-            || ! (sbv_ota_msg_tx_instance.is_ack))
+        retry_time = 0;
+        while (retry_time < sbv_ota_msg_tx_instance.max_retry)
         {
-            /* LOG */
-            retry_time++;
-            continue;
-        }
+            sbv_ota_msg_tx_instance.is_ack = SBV_FALSE;
+            ret = sbv_ota_msg_send_data_frame (images, chunk_length);
+            if (ret < 0)
+            {
+                /* LOG */
+                retry_time++;
+                continue;
+            }
 
-        /* LOG */
-        break;
+            /* This function will call the callback function for handling respose from peer */
+            buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
+            if (! buff || ! data_length
+                || ! (sbv_ota_msg_tx_instance.is_ack))
+            {
+                /* LOG */
+                retry_time++;
+                continue;
+            }
+
+            /* LOG */
+            break;
+        }
     }
+    
+    
 
     sbv_ota_msg_tx_instance.next_state = SBV_OTA_NEXT_STATE(SBV_OTA_STATE_END,
                                                             retry_time,
@@ -513,7 +512,7 @@ sbv_ota_msg_rx_handle_cmd(uint8_t *data, uint32_t data_length)
 
     pkt_crc         = cmd_pkt->crc;
     cmd_pkt->crc    = 0;
-    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)cmd_pkt, data_length);
+    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
     if(pkt_crc != new_crc)
         return SBV_ERROR;
 
