@@ -13,8 +13,6 @@
 #define SBV_OTA_DATA_OVERHEAD     (6)
 #define SBV_OTA_PACKET_MAX_SIZE   (SBV_OTA_DATA_MAX_SIZE + SBV_OTA_DATA_OVERHEAD)
 
-typedef struct sbv_ota_fw_metadata_t sbv_ota_fw_metadata_t;
-
 /* State of the OTA process FSM */
 typedef enum sbv_ota_state_t
 {
@@ -148,8 +146,6 @@ typedef struct sbv_ota_msg_hw_cb_t
 
 uint32_t
 sbv_ota_msg_crc_calculate (uint8_t *buffer, uint32_t buffer_length);
-int
-sbv_ota_msg_send_data(uint8_t *data, uint32_t data_length);
 int
 sbv_ota_msg_rx_handle(uint8_t *data, const uint16_t data_length);
 void

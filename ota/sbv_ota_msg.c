@@ -243,6 +243,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length)
         data_pkt->packet_type   = SBV_OTA_PACKET_TYPE_DATA;
         data_pkt->crc           = 0;
         memcpy(data_pkt->data, data, pkt_data_length);
+        data                    += pkt_data_length;
         data_pkt->crc           = sbv_ota_msg_crc_calculate((uint8_t *)data_pkt, pkt_length);
 
         ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length, SBV_OTA_MSG_TX_TIMEOUT_MS);
@@ -601,7 +602,7 @@ sbv_ota_msg_handle_data(uint8_t *data, uint32_t data_length)
 {
     sbv_ota_data_pkt_t* data_pkt;
     uint32_t pkt_crc, new_crc;
-    int ret, img_size, rcv_size;
+    int ret, rcv_size;
 
     if(! data || ! data_length)
         return SBV_ERROR;
@@ -641,7 +642,7 @@ sbv_ota_msg_handle_data(uint8_t *data, uint32_t data_length)
         goto TRIGGER;
     }
 
-    if((img_size = sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue)) < SBV_OTA_PAGES_SIZE)
+    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < SBV_OTA_PAGES_SIZE)
     {
         sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
         return SBV_BUSY;

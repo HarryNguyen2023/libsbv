@@ -4,6 +4,7 @@
 #include "sbv_rtos.h"
 #include "sbv_cqbuff.h"
 #include "sbv_can.h"
+#include "sbv_ota.h"
 #include "sbv_ota_msg.h"
 
 sbv_rtos_mutex_t SBV_CAN_RX_BUFFER_MUTEX;
