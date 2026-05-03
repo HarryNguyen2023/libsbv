@@ -31,6 +31,7 @@ typedef enum sbv_ota_pkt_type_t
 	SBV_OTA_PACKET_TYPE_DATA,
 	SBV_OTA_PACKET_TYPE_HEADER,
 	SBV_OTA_PACKET_TYPE_RESPONSE,
+  SBV_OTA_PACKET_TYPE_REPORT,
 } sbv_ota_pkt_type_t;
 
 /* SBV OTA commands */
@@ -40,6 +41,12 @@ typedef enum sbv_ota_cmd_t
 	SBV_OTA_CMD_END,
 	SBV_OTA_CMD_ABORT,
 } sbv_ota_cmd_t;
+
+typedef enum sbv_ota_upd_status
+{
+	SBV_OTA_UPD_SUCCESS,
+  SBV_OTA_UDP_FAILED,
+} sbv_ota_upd_status;
 
 /* OTA meta data info */
 typedef struct sbv_ota_data_info_t
@@ -119,6 +126,25 @@ typedef struct sbv_ota_resp_pkt_t
   uint8_t   eof;
 } __attribute__((packed)) sbv_ota_resp_pkt_t;
 
+/*
+ * OTA Report format
+ *
+ * _____________________________________________
+ * |     | Packet |        | Header |     |     |
+ * | SOF |  Type  | Status |  Data  | CRC | EOF |
+ * |_____|________|________|________|_____|_____|
+ *   1B      1B       8B     4B    1B
+ */
+typedef struct sbv_ota_report_pkt_t
+{
+  uint8_t               sof;
+  uint8_t               packet_type;
+  sbv_ota_upd_status    status;
+  sbv_ota_fw_metadata_t upd_fw_metadata;
+  uint32_t              crc;
+  uint8_t               eof;
+} __attribute__((packed)) sbv_ota_report_pkt_t;
+
 typedef struct sbv_ota_msg_rx_instance_t
 {
   sbv_cqbuff*       rx_queue;
@@ -127,6 +153,8 @@ typedef struct sbv_ota_msg_rx_instance_t
   sbv_ota_state_t   rx_state;
   uint32_t          image_size;
   uint32_t          rcvd_image_size;
+  uint32_t          current_flash_page_addr;
+  uint8_t           is_update_enable;
 } sbv_ota_msg_rx_instance_t;
 
 typedef struct sbv_ota_msg_tx_instance_t

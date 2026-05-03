@@ -40,9 +40,11 @@ sbv_ota_update_init(void)
 
     memset(&sbv_ota_msg_rx_instance, 0, sizeof(sbv_ota_msg_rx_instance_t));
     sbv_rtos_mutex_create (sbv_ota_msg_rx_instance.mutex);
-    sbv_ota_msg_rx_instance.rx_state    = SBV_OTA_STATE_IDLE;
-    sbv_ota_msg_rx_instance.rx_queue    = sbv_cqbuff_create (SBV_OTA_PACKET_MAX_SIZE, sizeof (uint8_t));
-    sbv_ota_msg_rx_instance.data_queue  = sbv_cqbuff_create (SBV_OTA_PAGES_SIZE, sizeof (uint8_t));
+    sbv_ota_msg_rx_instance.rx_state            = SBV_OTA_STATE_IDLE;
+    sbv_ota_msg_rx_instance.is_update_enable    = SBV_TRUE;
+
+    sbv_ota_msg_rx_instance.rx_queue            = sbv_cqbuff_create (SBV_OTA_PACKET_MAX_SIZE, sizeof (uint8_t));
+    sbv_ota_msg_rx_instance.data_queue          = sbv_cqbuff_create (SBV_OTA_PAGES_SIZE, sizeof (uint8_t));
     if (! sbv_ota_msg_rx_instance.rx_queue)
     {
         /* LOG */
@@ -340,7 +342,7 @@ sbv_ota_write_flash_data (uint8_t *data, uint32_t data_length, uint32_t page_add
 int
 sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
 {
-    int i;
+    int i, found = SBV_FALSE;
 	sbv_ota_general_cfg cfg;
 
     if (! current_fw_medata)
@@ -356,11 +358,15 @@ sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
         if (cfg.slot_table[i].is_slot_active)
         {
             memcpy (current_fw_medata, &(cfg.slot_table[i].metadata), sizeof (sbv_ota_fw_metadata_t));
+            found = SBV_TRUE;
             break;
         }
     }
 
     SBV_OTA_DB_MUTEX_UNLOCK;
+
+    if (! found)
+        return -1;
 
     return 0;
 }
@@ -417,6 +423,187 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
     return 0;
 }
 
+int
+sbv_ota_fw_metadata_validate (uint32_t* slot_pag_add, uint8_t* inactive_slot)
+{
+    int ret;
+    sbv_ota_fw_metadata_t current_fw_metadata;
+
+    if (! slot_pag_add)
+        return SBV_ERROR;
+
+    memset(&current_fw_metadata, 0, sizeof(sbv_ota_fw_metadata_t));
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    ret = sbv_cqbuff_read (sbv_ota_msg_rx_instance.rx_queue, (unsigned char *)&fw_metadata,
+                           sizeof (sbv_ota_fw_metadata_t));
+    if (ret != sizeof (sbv_ota_fw_metadata_t))
+    {
+        /* LOG */
+        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+        return SBV_ERROR;
+    }
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
+    // Check if the new firmware size is larger the allowable size of A/B partition
+    // to avoid the firmware overload attack
+    if (fw_metadata.fw_size > SBV_OTA_SLOT_MAX_SIZE)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    ret = sbv_ota_get_current_fw_metadata (&current_fw_metadata);
+    if (ret != 0)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    /* Check if the on going fw has the same metadata or not, to continue the process */
+    if (! memcmp (&fw_metadata, &current_fw_metadata, sizeof(sbv_ota_fw_metadata_t)))
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+    // Avoid firmware rollback attack
+    else if (memcmp (fw_metadata.fw_version, current_fw_metadata.fw_version, 2) < 0)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+    else
+    {
+        /* Erase the FLASH memory of the inactive slot */
+        *inactive_slot = sbv_ota_get_available_slot_num ();
+        if (*inactive_slot == SBV_OTA_INVALID_SLOT)
+        {
+            /* LOG */
+            return SBV_ERROR;
+        }
+
+        *slot_pag_add = SBV_OTA_SLOT_PAGE_ADDR(*inactive_slot);
+        ret = sbv_ota_erase_flash_pages (*slot_pag_add, SBV_OTA_FW_SLOT_PAGES);
+        if (ret != SBV_OK)
+        {
+            /* LOG */
+            return SBV_ERROR;
+        }
+    }
+
+    return SBV_OK;
+}
+
+int
+sbv_ota_fw_write_page (const uint32_t slot_pag_add)
+{
+    int ret;
+
+    if (slot_pag_add != SBV_OTA_SLOT0_FLASH_ADD
+        || slot_pag_add != SBV_OTA_SLOT1_FLASH_ADD)
+        return SBV_ERROR;
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    ret = sbv_cqbuff_read (sbv_ota_msg_rx_instance.rx_queue, fw_pages, SBV_OTA_PAGES_SIZE);
+    if (ret != SBV_OTA_PAGES_SIZE)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
+    ret = sbv_ota_write_flash_data((uint8_t *)fw_pages, SBV_OTA_PAGES_SIZE,
+                                    slot_pag_add + sbv_ota_msg_rx_instance.current_flash_page_addr);
+    if (ret != SBV_OK)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    sbv_ota_msg_rx_instance.current_flash_page_addr += SBV_OTA_PAGES_SIZE;
+
+    return SBV_OK;
+}
+
+int
+sbv_ota_handle_final_upd (const uint32_t slot_pag_add, const uint8_t inactive_slot)
+{
+    int ret, is_image_valid;
+    uint32_t fw_img_crc;
+
+    if (slot_pag_add != SBV_OTA_SLOT0_FLASH_ADD
+        || slot_pag_add != SBV_OTA_SLOT1_FLASH_ADD)
+        return SBV_ERROR;
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    if (sbv_ota_msg_rx_instance.rcvd_image_size < fw_metadata.fw_size)
+    {
+        /* LOG */
+        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+        return SBV_ERROR;
+    }
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
+    fw_img_crc = sbv_ota_fw_crc_cal (slot_pag_add, fw_metadata);
+    is_image_valid = (fw_img_crc == fw_metadata.fw_crc) ? SBV_TRUE : SBV_FALSE;
+
+    /* Save metadata of system into Flash */
+    ret = sbv_ota_save_fw_img_cfg (inactive_slot, &fw_metadata, is_image_valid);
+    if (ret != 0)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    /* Send report msg */
+    sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_REPORT);
+
+    /* Reset the system after 10s */
+    sbv_rtos_task_delay(sbv_rtos_ms_to_tick(SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS));
+#ifdef STM32F1xx
+    HAL_NVIC_SystemReset ();
+#endif /* STM32F1xx */
+
+    return SBV_OK;
+}
+
+uint8_t
+sbv_ota_get_update_permission (void)
+{
+    uint8_t is_update_enable;
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    is_update_enable = sbv_ota_msg_rx_instance.is_update_enable;
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
+    return is_update_enable;
+}
+
+void
+sbv_ota_abort_fw_upd (void)
+{
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    // Reset the state of the rx instance
+    sbv_ota_msg_rx_instance.rx_state                = SBV_OTA_STATE_IDLE;
+    sbv_ota_msg_rx_instance.image_size              = 0;
+    sbv_ota_msg_rx_instance.rcvd_image_size         = 0;
+    sbv_ota_msg_rx_instance.current_flash_page_addr = 0;
+    sbv_ota_msg_rx_instance.is_update_enable        = SBV_TRUE;
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
+    sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_ABORT);
+}
+
 /*
  *@brief: Task to control the actual firmware update process, including 3 main sub-tasks
  *          - Check the metadata of the frimware going to receive
@@ -427,127 +614,79 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
 void
 sbv_ota_update_fw_thread (void *param)
 {
-    int ret, is_update_enable, read_size, current_page_addr, is_image_valid;
+    int ret, is_update_enable, is_rcvd_metadata;
     uint8_t inactive_slot;
     uint32_t slot_pag_add, fw_img_crc;
     sbv_rtos_event_bits_t rcv_data_bits;
-    sbv_ota_fw_metadata_t current_fw_metadata;
     sbv_rtos_tick_type_t tick_to_wait = sbv_rtos_ms_to_tick(portMAX_DELAY);
 
-    current_page_addr   = 0;
     is_update_enable    = SBV_TRUE;
+    is_rcvd_metadata    = SBV_FALSE;
     for(;;)
     {
         rcv_data_bits = sbv_rtos_event_group_wait_bits(sbv_ota_event_group,
-                                                       SBV_OTA_RCV_METADATA | SBV_OTA_RCV_PAGE | SBV_OTA_RCV_ALL,
+                                                       SBV_OTA_RCV_START | SBV_OTA_RCV_METADATA | SBV_OTA_RCV_PAGE | SBV_OTA_RCV_ALL,
                                                        SBV_RTOS_TRUE, SBV_RTOS_FALSE,
                                                        tick_to_wait);
-        if(rcv_data_bits & SBV_OTA_RCV_METADATA)
+        if(rcv_data_bits & SBV_OTA_RCV_START)
         {
-            sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+            
+        }
+        else if(rcv_data_bits & SBV_OTA_RCV_METADATA)
+        {
+            if (! sbv_ota_get_update_permission())
+                continue;
 
-            ret = sbv_cqbuff_read (sbv_ota_msg_rx_instance.rx_queue, (unsigned char *)&fw_metadata, sizeof (sbv_ota_fw_metadata_t));
-            if (ret != sizeof (sbv_ota_fw_metadata_t))
+            ret = sbv_ota_fw_metadata_validate (&slot_pag_add, &inactive_slot);
+            if (ret != SBV_OK)
             {
                 /* LOG */
-                is_update_enable = SBV_FALSE;
-                sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+                sbv_ota_abort_fw_upd ();
                 continue;
             }
 
-            sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
-
-            ret = sbv_ota_get_current_fw_metadata (&current_fw_metadata);
-            if (ret == 0)
-            {
-                /* LOG */
-                is_update_enable = SBV_FALSE;
-                continue;
-            }
-
-            /* Check if the on going fw has the same metadata or not, to continue the process */
-            if (! memcmp (&fw_metadata, &current_fw_metadata, sizeof(sbv_ota_fw_metadata_t)))
-            {
-                /* LOG */
-                is_update_enable = SBV_FALSE;
-            }
-            else
-            {
-                /* Erase the FLASH memory of the inactive slot */
-                inactive_slot = sbv_ota_get_available_slot_num ();
-                if (inactive_slot != SBV_OTA_INVALID_SLOT)
-                {
-                    slot_pag_add = SBV_OTA_SLOT_PAGE_ADDR(inactive_slot);
-                    ret = sbv_ota_erase_flash_pages (slot_pag_add, SBV_OTA_FW_SLOT_PAGES);
-                    if (ret != SBV_OK)
-                    {
-                        /* LOG */
-                        is_update_enable = SBV_FALSE;
-                    }
-                }
-            }
+            is_rcvd_metadata = SBV_TRUE;
         }
         else if(rcv_data_bits & SBV_OTA_RCV_PAGE)
         {
             /* Write pages of data to the FLASH memory */
-            read_size = 0;
-            if (is_update_enable)
+            if (! sbv_ota_get_update_permission())
+                continue;
+
+            if (! is_rcvd_metadata)
             {
-                sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+                /* LOG */
+                sbv_ota_abort_fw_upd ();
+                continue;
+            }
 
-                while (read_size < SBV_OTA_PAGES_SIZE)
-                {
-                    ret = sbv_cqbuff_read (sbv_ota_msg_rx_instance.rx_queue, fw_pages, SBV_OTA_PAGES_SIZE);
-                    if (ret == 0)
-                    {
-                        /* LOG */
-                        is_update_enable = SBV_FALSE;
-                        break;
-                    }
-
-                    read_size += ret;
-                }
-
-                sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
-
-                if (read_size == SBV_OTA_PAGES_SIZE)
-                {
-                    ret = sbv_ota_write_flash_data((uint8_t *)fw_pages, SBV_OTA_PAGES_SIZE,
-                                                    slot_pag_add + current_page_addr);
-                    if (ret != SBV_OK)
-                    {
-                        /* LOG */
-                        continue;
-                    }
-
-                    current_page_addr += SBV_OTA_PAGES_SIZE;
-                }
+            ret = sbv_ota_fw_write_page (slot_pag_add);
+            if (ret != SBV_OK)
+            {
+                /* LOG */
+                sbv_ota_abort_fw_upd ();
+                continue;
             }
         }
         else if(rcv_data_bits & SBV_OTA_RCV_ALL)
         {
-            if (! is_update_enable)
+            if (! sbv_ota_get_update_permission())
                 continue;
 
-            fw_img_crc = sbv_ota_fw_crc_cal (slot_pag_add, fw_metadata);
-            is_image_valid = (fw_img_crc == fw_metadata.fw_crc) ? SBV_TRUE : SBV_FALSE;
-
-            /* Send report msg */
-
-
-            /* Save metadata of system into Flash */
-            ret = sbv_ota_save_fw_img_cfg (inactive_slot, &fw_metadata, is_image_valid);
-            if (ret != 0)
+            if (! is_rcvd_metadata)
             {
                 /* LOG */
+                sbv_ota_abort_fw_upd ();
                 continue;
             }
 
-            /* Reset the system after 10s */
-            sbv_rtos_task_delay(sbv_rtos_ms_to_tick(SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS));
-#ifdef STM32F1xx
-            HAL_NVIC_SystemReset ();
-#endif /* STM32F1xx */
+            ret = sbv_ota_handle_final_upd (slot_pag_add, inactive_slot);
+            if (ret != SBV_OK)
+            {
+                /* LOG */
+                sbv_ota_abort_fw_upd ();
+                continue;
+            }
         }
     }
 }

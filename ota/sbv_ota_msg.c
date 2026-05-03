@@ -18,6 +18,8 @@ extern CRC_HandleTypeDef hcrc;
 #endif /*STM32F1xx*/
 #endif /* SBV_HW_CRC */
 
+extern sbv_ota_fw_metadata_t fw_metadata;
+
 #define SBV_OTA_MSG_TX_TIMEOUT_MS      (100)
 #define SBV_OTA_MSG_RX_TIMEOUT_MS      (100)
 
@@ -176,6 +178,31 @@ sbv_ota_msg_send_resp (uint8_t resp_type)
 }
 
 int
+sbv_ota_msg_send_report (const sbv_ota_upd_status upd_status,
+                         const sbv_ota_fw_metadata_t *fw_metadata)
+{
+    uint32_t pkt_crc;
+	sbv_ota_report_pkt_t report_pkt;
+
+    if (! fw_metadata)
+        return SBV_ERROR;
+
+    memset(&report_pkt, 0, sizeof(sbv_ota_report_pkt_t));
+
+    report_pkt.sof 			= SBV_OTA_SOF;
+    report_pkt.packet_type 	= SBV_OTA_PACKET_TYPE_REPORT;
+    report_pkt.status 		= upd_status;
+    memcpy (&report_pkt.upd_fw_metadata, fw_metadata, sizeof(sbv_ota_fw_metadata_t));
+    report_pkt.crc          = 0;
+    report_pkt.eof			= SBV_OTA_EOF;
+
+	pkt_crc = sbv_ota_msg_crc_calculate((uint8_t *)&report_pkt, sizeof(sbv_ota_report_pkt_t));
+    report_pkt.crc = pkt_crc;
+
+    return sbv_ota_msg_send((uint8_t *)&report_pkt, sizeof(sbv_ota_report_pkt_t), SBV_OTA_MSG_TX_TIMEOUT_MS);
+}
+
+int
 sbv_ota_msg_send_cmd (sbv_ota_cmd_t cmd_type)
 {
     uint32_t pkt_crc;
@@ -297,7 +324,8 @@ void sbv_ota_handle_state (sbv_ota_state_t current_state, sbv_ota_state_t next_s
     if (! state_cb || state_cb->next_state != next_state)
         return;
 
-    sbv_ota_msg_tx_instance.tx_state = next_state;
+    sbv_ota_msg_tx_instance.max_retry   = 0;
+    sbv_ota_msg_tx_instance.tx_state    = next_state;
     (*state_cb->state_func) (current_state, data);
 }
 
@@ -476,9 +504,16 @@ void sbv_ota_state_end (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
-        if (! buff || ! data_length
-            || ! (sbv_ota_msg_tx_instance.is_ack))
+        buff = sbv_ota_msg_rcv (sizeof(sbv_ota_resp_pkt_t), SBV_OTA_MSG_RX_TIMEOUT_MS);
+            if (! buff || ! (sbv_ota_msg_tx_instance.is_ack))
+        {
+            /* LOG */
+            retry_time++;
+            continue;
+        }
+
+        buff = sbv_ota_msg_rcv (sizeof(sbv_ota_report_pkt_t), SBV_OTA_MSG_RX_TIMEOUT_MS);
+            if (! buff)
         {
             /* LOG */
             retry_time++;
@@ -554,13 +589,20 @@ sbv_ota_msg_rx_handle_cmd(uint8_t *data, uint32_t data_length)
 
     if((sbv_ota_msg_rx_instance.rx_state == SBV_OTA_STATE_START)
         && (cmd_pkt.cmd == SBV_OTA_CMD_START))
+    {
         sbv_ota_msg_rx_instance.rx_state = SBV_OTA_STATE_HEADER;
+        sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_START);
+    }
     else if((sbv_ota_msg_rx_instance.rx_state == SBV_OTA_STATE_END)
             && (cmd_pkt.cmd == SBV_OTA_CMD_END))
     {
         sbv_ota_msg_rx_instance.rx_state = SBV_OTA_STATE_IDLE;
         /* Trigger to send report to the peer */
         sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_ALL);
+    }
+    else if (cmd_pkt.cmd == SBV_OTA_CMD_ABORT)
+    {
+        /* LOG */
     }
     else
     {
@@ -636,7 +678,7 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
     if (ret != sizeof(sbv_ota_fw_metadata_t))
     {
         /* LOG */
-        goto ERR_EXIT;
+        goto ERR_EXIT1;
     }
 
     sbv_ota_msg_rx_instance.image_size  = header_pkt.data_info.fw_size;
@@ -648,6 +690,9 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
     sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_METADATA);
     
     return SBV_OK;
+
+ERR_EXIT1:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.data_queue);
 
 ERR_EXIT:
     sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
@@ -737,7 +782,7 @@ PKT_CHECK:
     if (ret != SBV_OTA_PAGES_SIZE)
     {
         /* LOG */
-        goto ERR_EXIT;
+        goto ERR_EXIT1;
     }
 
     sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
@@ -745,6 +790,9 @@ PKT_CHECK:
     sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_PAGE);
 
     return SBV_OK;
+
+ERR_EXIT1:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.data_queue);
 
 ERR_EXIT:
     sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
@@ -756,6 +804,7 @@ int
 sbv_ota_msg_rx_handle(uint8_t *data, const uint16_t data_length)
 {
     int ret = SBV_OK;
+    sbv_rtos_event_bits_t rcv_data_bits;
 
     if(! data || ! data_length)
         return SBV_ERROR;
@@ -788,6 +837,24 @@ sbv_ota_msg_rx_handle(uint8_t *data, const uint16_t data_length)
 
     if (ret == SBV_BUSY)
         return SBV_OK;
+
+    // Check if the current device find update error and want to abort
+    // the current firmware update process
+    rcv_data_bits = sbv_rtos_event_group_wait_bits(sbv_ota_event_group,
+                                                   SBV_OTA_RCV_ABORT | SBV_OTA_RCV_REPORT,
+                                                   SBV_RTOS_TRUE, SBV_RTOS_FALSE,
+                                                   sbv_rtos_ms_to_tick (10));
+    if (rcv_data_bits & SBV_OTA_RCV_ABORT)
+    {
+        sbv_ota_msg_send_cmd (SBV_OTA_CMD_ABORT);
+        return SBV_ERROR;
+    }
+    else if (rcv_data_bits & SBV_OTA_RCV_REPORT)
+    {
+        sbv_ota_msg_send_resp (SBV_OTA_ACK);
+        sbv_rtos_task_delay(sbv_rtos_ms_to_tick(20));
+        sbv_ota_msg_send_report (SBV_OTA_UPD_SUCCESS, &fw_metadata);
+    }
 
 EXIT:
     sbv_ota_msg_send_resp((ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK);

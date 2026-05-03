@@ -27,10 +27,12 @@
 
 #define SBV_OTA_RCV_ACK       (1 << 0)
 #define SBV_OTA_RCV_NACK      (1 << 1)
-#define SBV_OTA_RCV_METADATA  (1 << 2)
-#define SBV_OTA_RCV_PAGE      (1 << 3)
-#define SBV_OTA_RCV_ALL       (1 << 4)
-#define SBV_OTA_RCV_REPORT    (1 << 5)
+#define SBV_OTA_RCV_START     (1 << 2)
+#define SBV_OTA_RCV_METADATA  (1 << 3)
+#define SBV_OTA_RCV_PAGE      (1 << 4)
+#define SBV_OTA_RCV_ALL       (1 << 5)
+#define SBV_OTA_RCV_REPORT    (1 << 6)
+#define SBV_OTA_RCV_ABORT     (1 << 7)
 
 typedef struct sbv_ota_fw_metadata_t
 {
