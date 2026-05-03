@@ -122,10 +122,11 @@ typedef struct sbv_ota_resp_pkt_t
 typedef struct sbv_ota_msg_rx_instance_t
 {
   sbv_cqbuff*       rx_queue;
+  sbv_cqbuff*       data_queue;
   sbv_rtos_mutex_t  mutex;
   sbv_ota_state_t   rx_state;
-  uint32_t          data_size;
-  uint32_t          rcv_data_size;
+  uint32_t          image_size;
+  uint32_t          rcvd_image_size;
 } sbv_ota_msg_rx_instance_t;
 
 typedef struct sbv_ota_msg_tx_instance_t
@@ -141,7 +142,7 @@ typedef struct sbv_ota_msg_hw_cb_t
 {
   int (*sbv_ota_msg_send) (uint8_t, uint8_t *, uint16_t, uint16_t);
   int (*sbv_ota_reg_cb) (int (*rx_cb)(uint8_t *, const uint16_t));
-  uint8_t* (*sbv_ota_rcv_data) (uint16_t, uint16_t);
+  uint8_t* (*sbv_ota_rcv_data) (uint16_t*, uint16_t);
 } sbv_ota_msg_hw_cb_t;
 
 uint32_t

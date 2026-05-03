@@ -40,8 +40,9 @@ sbv_ota_update_init(void)
 
     memset(&sbv_ota_msg_rx_instance, 0, sizeof(sbv_ota_msg_rx_instance_t));
     sbv_rtos_mutex_create (sbv_ota_msg_rx_instance.mutex);
-    sbv_ota_msg_rx_instance.rx_state = SBV_OTA_STATE_IDLE;
-    sbv_ota_msg_rx_instance.rx_queue = sbv_cqbuff_create (SBV_OTA_PAGES_SIZE, sizeof (uint8_t));
+    sbv_ota_msg_rx_instance.rx_state    = SBV_OTA_STATE_IDLE;
+    sbv_ota_msg_rx_instance.rx_queue    = sbv_cqbuff_create (SBV_OTA_PACKET_MAX_SIZE, sizeof (uint8_t));
+    sbv_ota_msg_rx_instance.data_queue  = sbv_cqbuff_create (SBV_OTA_PAGES_SIZE, sizeof (uint8_t));
     if (! sbv_ota_msg_rx_instance.rx_queue)
     {
         /* LOG */

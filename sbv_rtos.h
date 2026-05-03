@@ -98,4 +98,7 @@ typedef EventBits_t             sbv_rtos_event_bits_t;
 #define sbv_rtos_event_group_delete(G)  \
         vEventGroupDelete(G)
 
+#define sbv_rtos_get_tick() \
+        xTaskGetTickCount()
+
 #endif  /*SBV_RTOS_H*/

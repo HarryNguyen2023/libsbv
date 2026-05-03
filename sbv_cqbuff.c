@@ -169,3 +169,12 @@ void sbv_cqbuff_dump (sbv_cqbuff *buff, void (*sbv_cqbuff_element_print)(void *)
 
   printf ("\n");
 }
+
+void sbv_cqbuff_flush (sbv_cqbuff *buff)
+{
+  if (! buff)
+    return;
+
+  buff->head = -1;
+  buff->rear = -1;
+}

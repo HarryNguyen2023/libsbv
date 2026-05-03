@@ -100,14 +100,28 @@ sbv_ota_msg_send (uint8_t *data, uint16_t length, uint16_t timeout_ms)
 }
 
 static uint8_t*
-sbv_ota_msg_rcv (uint16_t length, uint16_t timeout_ms)
+sbv_ota_msg_rcv (uint16_t required_length, uint16_t timeout_ms)
 {
-    if (sbv_ota_msg_hw_cb.sbv_ota_rcv_data)
+    uint32_t start_tick = sbv_rtos_get_tick();
+    uint8_t *buff = NULL;
+    uint16_t received_length = 0, total_rcv_length = 0;
+
+    while (sbv_rtos_get_tick() - start_tick < sbv_rtos_ms_to_tick(timeout_ms))
     {
-        return (sbv_ota_msg_hw_cb.sbv_ota_rcv_data) (length, timeout_ms);
+        if (sbv_ota_msg_hw_cb.sbv_ota_rcv_data)
+        {
+            buff = (sbv_ota_msg_hw_cb.sbv_ota_rcv_data) (&received_length, 10);
+            if (buff)
+            {
+                total_rcv_length += received_length;
+                if (total_rcv_length >= required_length)
+                    return buff;
+            }
+        }
+        sbv_rtos_task_delay(sbv_rtos_ms_to_tick(10));
     }
 
-    return 0;
+    return NULL;
 }
 
 uint32_t
@@ -297,7 +311,6 @@ void sbv_ota_state_start (sbv_ota_state_t current_state, void *data)
 {
     int ret;
     uint8_t *buff, retry_time;
-    uint16_t data_length;
 
     if (current_state != SBV_OTA_STATE_IDLE)
     {
@@ -318,9 +331,8 @@ void sbv_ota_state_start (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
-        if (! buff || ! data_length
-            || ! (sbv_ota_msg_tx_instance.is_ack))
+        buff = sbv_ota_msg_rcv (sizeof(sbv_ota_resp_pkt_t), SBV_OTA_MSG_RX_TIMEOUT_MS);
+        if (! buff || ! (sbv_ota_msg_tx_instance.is_ack))
         {
             /* LOG */
             retry_time++;
@@ -342,7 +354,6 @@ void sbv_ota_state_header (sbv_ota_state_t current_state, void *data)
 {
     int ret;
     uint8_t *buff, retry_time, *images;
-    uint16_t data_length;
     sbv_ota_fw_metadata_t *data_info;
 
     if (current_state != SBV_OTA_STATE_START)
@@ -366,9 +377,8 @@ void sbv_ota_state_header (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
-        if (! buff || ! data_length
-            || ! (sbv_ota_msg_tx_instance.is_ack))
+        buff = sbv_ota_msg_rcv (sizeof(sbv_ota_resp_pkt_t), SBV_OTA_MSG_RX_TIMEOUT_MS);
+        if (! buff || ! (sbv_ota_msg_tx_instance.is_ack))
         {
             /* LOG */
             retry_time++;
@@ -390,7 +400,7 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
 {
     int ret;
     uint8_t *buff, retry_time, *images;
-    uint16_t data_length, image_length, chunk_length;
+    uint16_t image_length, chunk_length;
 
     if (current_state != SBV_OTA_STATE_HEADER)
     {
@@ -418,9 +428,8 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
             }
 
             /* This function will call the callback function for handling respose from peer */
-            buff = sbv_ota_msg_rcv (&data_length, SBV_OTA_MSG_RX_TIMEOUT_MS);
-            if (! buff || ! data_length
-                || ! (sbv_ota_msg_tx_instance.is_ack))
+            buff = sbv_ota_msg_rcv (sizeof(sbv_ota_resp_pkt_t), SBV_OTA_MSG_RX_TIMEOUT_MS);
+            if (! buff || ! (sbv_ota_msg_tx_instance.is_ack))
             {
                 /* LOG */
                 retry_time++;
@@ -430,6 +439,7 @@ void sbv_ota_state_data (sbv_ota_state_t current_state, void *data)
             /* LOG */
             break;
         }
+        images += chunk_length;
     }
     
     
@@ -490,46 +500,80 @@ void sbv_ota_state_end (sbv_ota_state_t current_state, void *data)
 int
 sbv_ota_msg_rx_handle_cmd(uint8_t *data, uint32_t data_length)
 {
-    sbv_ota_cmd_pkt_t *cmd_pkt;
+    int ret;
+    sbv_ota_cmd_pkt_t cmd_pkt;
     uint32_t pkt_crc, new_crc;
 
     if(! data || ! data_length)
         return SBV_ERROR;
 
-    if(data_length != sizeof(sbv_ota_cmd_pkt_t))
+    memset(&cmd_pkt, 0, sizeof(sbv_ota_cmd_pkt_t));
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, data, data_length);
+    if (ret != data_length)
     {
         /* LOG */
-        return SBV_ERROR;
+        goto ERR_EXIT;
     }
 
-    cmd_pkt = (sbv_ota_cmd_pkt_t *)data;
+    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < sizeof(sbv_ota_cmd_pkt_t))
+    {
+        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+        return SBV_BUSY;
+    }
 
-    if((cmd_pkt->sof != SBV_OTA_SOF) || (cmd_pkt->eof != SBV_OTA_EOF))
-        return SBV_ERROR;
+    ret = sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
+    if (ret != sizeof(sbv_ota_cmd_pkt_t))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
-    if(cmd_pkt->packet_type != SBV_OTA_PACKET_TYPE_CMD)
-        return SBV_ERROR;
+    if((cmd_pkt.sof != SBV_OTA_SOF) || (cmd_pkt.eof != SBV_OTA_EOF))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
-    pkt_crc         = cmd_pkt->crc;
-    cmd_pkt->crc    = 0;
-    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
+    if(cmd_pkt.packet_type != SBV_OTA_PACKET_TYPE_CMD)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    pkt_crc         = cmd_pkt.crc;
+    cmd_pkt.crc     = 0;
+    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
     if(pkt_crc != new_crc)
-        return SBV_ERROR;
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
     if((sbv_ota_msg_rx_instance.rx_state == SBV_OTA_STATE_START)
-        && (cmd_pkt->cmd == SBV_OTA_CMD_START))
+        && (cmd_pkt.cmd == SBV_OTA_CMD_START))
         sbv_ota_msg_rx_instance.rx_state = SBV_OTA_STATE_HEADER;
     else if((sbv_ota_msg_rx_instance.rx_state == SBV_OTA_STATE_END)
-            && (cmd_pkt->cmd == SBV_OTA_CMD_END))
+            && (cmd_pkt.cmd == SBV_OTA_CMD_END))
     {
         sbv_ota_msg_rx_instance.rx_state = SBV_OTA_STATE_IDLE;
         /* Trigger to send report to the peer */
         sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_ALL);
     }
     else
-        return SBV_ERROR;
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
     return SBV_OK;
+
+ERR_EXIT:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+    return SBV_ERROR;
 }
 
 int
@@ -542,10 +586,12 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
     if(! data || ! data_length)
         return SBV_ERROR;
 
+    memset(&header_pkt, 0, sizeof(sbv_ota_header_pkt_t));
+
     sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
 
     ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, data, data_length);
-    if (ret <= 0)
+    if (ret != data_length)
     {
         /* LOG */
         goto ERR_EXIT;
@@ -557,12 +603,24 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
         return SBV_BUSY;
     }
 
-    sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &header_pkt, sizeof(sbv_ota_header_pkt_t));
-    if((header_pkt.sof != SBV_OTA_SOF) || (header_pkt.eof != SBV_OTA_EOF))
+    ret = sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &header_pkt, sizeof(sbv_ota_header_pkt_t));
+    if (ret != sizeof(sbv_ota_header_pkt_t))
+    {
+        /* LOG */
         goto ERR_EXIT;
+    }
+
+    if((header_pkt.sof != SBV_OTA_SOF) || (header_pkt.eof != SBV_OTA_EOF))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
     if(header_pkt.packet_type != SBV_OTA_PACKET_TYPE_HEADER)
+    {
+        /* LOG */
         goto ERR_EXIT;
+    }
 
     pkt_crc         = header_pkt.crc;
     header_pkt.crc  = 0;
@@ -573,15 +631,15 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
         goto ERR_EXIT;
     }
 
-    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, &(header_pkt.data_info),
+    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.data_queue, &(header_pkt.data_info),
                             sizeof(sbv_ota_fw_metadata_t));
-    if (ret <= 0)
+    if (ret != sizeof(sbv_ota_fw_metadata_t))
     {
         /* LOG */
         goto ERR_EXIT;
     }
 
-    sbv_ota_msg_rx_instance.data_size   = header_pkt.data_info.fw_size;
+    sbv_ota_msg_rx_instance.image_size  = header_pkt.data_info.fw_size;
     sbv_ota_msg_rx_instance.rx_state    = SBV_OTA_STATE_DATA;
 
     sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
@@ -592,26 +650,78 @@ sbv_ota_msg_rx_handle_header(uint8_t *data, uint32_t data_length)
     return SBV_OK;
 
 ERR_EXIT:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
     sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
     return SBV_ERROR;
 }
 
+/*
+ * This function handles the data (image) packet send by our peer,
+ * which break the raw images into chunks and send it chunk-by-chunk to us.
+ * Thus, we must handle 2 case
+ *      - Full size chunk images (max chunk size)
+ *      - The last chunk with perhaps smaller size
+ */
 int
 sbv_ota_msg_handle_data(uint8_t *data, uint32_t data_length)
 {
-    sbv_ota_data_pkt_t* data_pkt;
+    sbv_ota_data_pkt_t *data_pkt;
     uint32_t pkt_crc, new_crc;
     int ret, rcv_size;
 
     if(! data || ! data_length)
         return SBV_ERROR;
 
-    data_pkt        = (sbv_ota_data_pkt_t *)data;
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    rcv_size = data_length - sizeof(sbv_ota_data_pkt_t);
+    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, data, data_length);
+    if (ret != data_length)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+    sbv_ota_msg_rx_instance.rcvd_image_size += rcv_size;
+    if (sbv_ota_msg_rx_instance.rcvd_image_size >= sbv_ota_msg_rx_instance.image_size)
+    {
+        sbv_ota_msg_rx_instance.rcvd_image_size  = 0;
+        sbv_ota_msg_rx_instance.image_size       = 0;
+        sbv_ota_msg_rx_instance.rx_state         = SBV_OTA_STATE_END;
+        goto PKT_CHECK;
+    }
+
+    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < SBV_OTA_PACKET_MAX_SIZE)
+    {
+        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+        return SBV_BUSY;
+    }
+
+PKT_CHECK:
+    data_pkt = sbv_rtos_malloc (SBV_OTA_PACKET_MAX_SIZE);
+    if (! data_pkt)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    ret = sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, data_pkt, SBV_OTA_PACKET_MAX_SIZE);
+    if (ret != SBV_OTA_PACKET_MAX_SIZE)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
     if (data_pkt->sof != SBV_OTA_SOF)
-        return SBV_ERROR;
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
     if (data_pkt->packet_type != SBV_OTA_PACKET_TYPE_DATA)
-        return SBV_ERROR;
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
     pkt_crc         = data_pkt->crc;
     data_pkt->crc   = 0;
@@ -619,40 +729,27 @@ sbv_ota_msg_handle_data(uint8_t *data, uint32_t data_length)
     if(pkt_crc != new_crc)
     {
         /* LOG */
-        return SBV_ERROR;
+        goto ERR_EXIT;
     }
 
-    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
-
-    rcv_size = data_length - sizeof(sbv_ota_data_pkt_t);
-    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, data_pkt->data, rcv_size);
-    if (ret <= 0)
+    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.data_queue, data_pkt->data,
+                            SBV_OTA_PAGES_SIZE);
+    if (ret != SBV_OTA_PAGES_SIZE)
     {
         /* LOG */
-        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
-        return SBV_ERROR;
-    }
-    sbv_ota_msg_rx_instance.rcv_data_size += rcv_size;
-    if (sbv_ota_msg_rx_instance.rcv_data_size >= sbv_ota_msg_rx_instance.data_size)
-    {
-        sbv_ota_msg_rx_instance.rcv_data_size   = 0;
-        sbv_ota_msg_rx_instance.data_size       = 0;
-        sbv_ota_msg_rx_instance.rx_state        = SBV_OTA_STATE_END;
-        goto TRIGGER;
+        goto ERR_EXIT;
     }
 
-    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < SBV_OTA_PAGES_SIZE)
-    {
-        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
-        return SBV_BUSY;
-    }
-
-TRIGGER:
     sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
     /* Trigger event to sbv_ota_update_fw_thread */
     sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_PAGE);
 
     return SBV_OK;
+
+ERR_EXIT:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+    return SBV_ERROR;
 }
 
 int
@@ -700,53 +797,79 @@ EXIT:
 int
 sbv_ota_msg_handle_resp(uint8_t *data, uint32_t data_length)
 {
-    sbv_ota_resp_pkt_t *resp_pkt;
+    int ret;
+    sbv_ota_resp_pkt_t resp_pkt;
     uint32_t pkt_crc, new_crc;
 
     if(! data || ! data_length)
         return SBV_ERROR;
 
-    if(data_length != sizeof(sbv_ota_resp_pkt_t))
-        return SBV_ERROR;
+    memset(&resp_pkt, 0, sizeof(sbv_ota_resp_pkt_t));
 
-    resp_pkt = (sbv_ota_resp_pkt_t *)data;
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
 
-    if((resp_pkt->sof != SBV_OTA_SOF) || (resp_pkt->eof != SBV_OTA_EOF))
-        return SBV_ERROR;
+    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, data, data_length);
+    if (ret != data_length)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
 
-    if(resp_pkt->packet_type != SBV_OTA_PACKET_TYPE_RESPONSE)
-        return SBV_ERROR;
+    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < sizeof(sbv_ota_resp_pkt_t))
+    {
+        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+        return SBV_BUSY;
+    }
 
-    pkt_crc         = resp_pkt->crc;
-    resp_pkt->crc   = 0;
-    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)resp_pkt, data_length);
+    ret = sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &resp_pkt, sizeof(sbv_ota_resp_pkt_t));
+    if (ret != sizeof(sbv_ota_resp_pkt_t))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if((resp_pkt.sof != SBV_OTA_SOF) || (resp_pkt.eof != SBV_OTA_EOF))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if(resp_pkt.packet_type != SBV_OTA_PACKET_TYPE_RESPONSE)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    pkt_crc         = resp_pkt.crc;
+    resp_pkt.crc    = 0;
+    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)&resp_pkt, data_length);
     if(pkt_crc != new_crc)
     {
         /* LOG */
         return SBV_ERROR;
     }
 
-    sbv_ota_msg_tx_instance.is_ack = (resp_pkt->status == SBV_OTA_ACK) ? SBV_TRUE : SBV_FALSE;
+    sbv_ota_msg_tx_instance.is_ack = (resp_pkt.status == SBV_OTA_ACK) ? SBV_TRUE : SBV_FALSE;
     return SBV_OK;
+
+ERR_EXIT:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+    return SBV_ERROR;
 }
 
 int
 sbv_ota_msg_resp_handle(uint8_t *data, const uint16_t data_length)
 {
     int ret = SBV_OK;
-    sbv_ota_resp_pkt_t *resp_pkt;
 
     if(! data || ! data_length)
         return SBV_ERROR;
 
-    resp_pkt = (sbv_ota_resp_pkt_t *)data;
-    if((resp_pkt->packet_type == SBV_OTA_PACKET_TYPE_RESPONSE))
+    ret = sbv_ota_msg_handle_resp(data, data_length);
+    if (ret != SBV_OK)
     {
-        ret = sbv_ota_msg_handle_resp(data, data_length);
-        if (ret != SBV_OK)
-        {
-            return ret;
-        }
+        return ret;
     }
 
     return SBV_OK;
