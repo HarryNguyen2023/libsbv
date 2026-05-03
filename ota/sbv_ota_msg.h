@@ -155,6 +155,7 @@ typedef struct sbv_ota_msg_rx_instance_t
   uint32_t          rcvd_image_size;
   uint32_t          current_flash_page_addr;
   uint8_t           is_update_enable;
+  uint8_t           is_updating;
 } sbv_ota_msg_rx_instance_t;
 
 typedef struct sbv_ota_msg_tx_instance_t

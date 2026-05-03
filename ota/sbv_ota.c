@@ -14,6 +14,8 @@
 #define SBV_OTA_SEND_UPDATE_FW_PRIO     (3)
 #define SBV_OTA_UPDATE_FW_PRIO          (3)
 
+#define SBV_OTA_UPDATE_WATCHDOG_MS      (500)
+
 sbv_rtos_mutex_t SBV_OTA_DB_MUTEX;
 
 sbv_event_group_handle_t    sbv_ota_event_group;
@@ -502,7 +504,7 @@ sbv_ota_fw_write_page (const uint32_t slot_pag_add)
     int ret;
 
     if (slot_pag_add != SBV_OTA_SLOT0_FLASH_ADD
-        || slot_pag_add != SBV_OTA_SLOT1_FLASH_ADD)
+        && slot_pag_add != SBV_OTA_SLOT1_FLASH_ADD)
         return SBV_ERROR;
 
     sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
@@ -536,7 +538,7 @@ sbv_ota_handle_final_upd (const uint32_t slot_pag_add, const uint8_t inactive_sl
     uint32_t fw_img_crc;
 
     if (slot_pag_add != SBV_OTA_SLOT0_FLASH_ADD
-        || slot_pag_add != SBV_OTA_SLOT1_FLASH_ADD)
+        && slot_pag_add != SBV_OTA_SLOT1_FLASH_ADD)
         return SBV_ERROR;
 
     sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
@@ -587,6 +589,30 @@ sbv_ota_get_update_permission (void)
     return is_update_enable;
 }
 
+uint8_t
+sbv_ota_get_update_status (void)
+{
+    uint8_t is_updating;
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    is_updating = sbv_ota_msg_rx_instance.is_updating;
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
+    return is_updating;
+}
+
+void
+sbv_ota_set_update_status (uint8_t is_updating)
+{
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    sbv_ota_msg_rx_instance.is_updating = is_updating;
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+}
+
 void
 sbv_ota_abort_fw_upd (void)
 {
@@ -598,6 +624,7 @@ sbv_ota_abort_fw_upd (void)
     sbv_ota_msg_rx_instance.rcvd_image_size         = 0;
     sbv_ota_msg_rx_instance.current_flash_page_addr = 0;
     sbv_ota_msg_rx_instance.is_update_enable        = SBV_TRUE;
+    sbv_ota_msg_rx_instance.is_updating             = SBV_FALSE;
 
     sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
 
@@ -618,19 +645,38 @@ sbv_ota_update_fw_thread (void *param)
     uint8_t inactive_slot;
     uint32_t slot_pag_add, fw_img_crc;
     sbv_rtos_event_bits_t rcv_data_bits;
-    sbv_rtos_tick_type_t tick_to_wait = sbv_rtos_ms_to_tick(portMAX_DELAY);
+    sbv_rtos_tick_type_t tick_to_wait;
 
-    is_update_enable    = SBV_TRUE;
-    is_rcvd_metadata    = SBV_FALSE;
+    is_update_enable           = SBV_TRUE;
+    is_rcvd_metadata           = SBV_FALSE;
+    tick_to_wait               = portMAX_DELAY;
+    inactive_slot              = SBV_OTA_INVALID_SLOT;
+
     for(;;)
     {
+        tick_to_wait = sbv_ota_get_update_status() ? sbv_rtos_ms_to_tick(SBV_OTA_UPDATE_WATCHDOG_MS) : portMAX_DELAY;
+
         rcv_data_bits = sbv_rtos_event_group_wait_bits(sbv_ota_event_group,
                                                        SBV_OTA_RCV_START | SBV_OTA_RCV_METADATA | SBV_OTA_RCV_PAGE | SBV_OTA_RCV_ALL,
                                                        SBV_RTOS_TRUE, SBV_RTOS_FALSE,
                                                        tick_to_wait);
-        if(rcv_data_bits & SBV_OTA_RCV_START)
+
+        if (rcv_data_bits == 0)
         {
-            
+            if (sbv_ota_get_update_status())
+            {
+                /* Watchdog timeout: no next OTA event arrived in time */
+                sbv_ota_abort_fw_upd ();
+                is_rcvd_metadata = SBV_FALSE;
+            }
+            continue;
+        }
+        else if(rcv_data_bits & SBV_OTA_RCV_START)
+        {
+            if (! sbv_ota_get_update_permission())
+                continue;
+
+            sbv_ota_set_update_status (SBV_TRUE);
         }
         else if(rcv_data_bits & SBV_OTA_RCV_METADATA)
         {
@@ -657,6 +703,7 @@ sbv_ota_update_fw_thread (void *param)
             {
                 /* LOG */
                 sbv_ota_abort_fw_upd ();
+                is_rcvd_metadata = SBV_FALSE;
                 continue;
             }
 
@@ -665,6 +712,7 @@ sbv_ota_update_fw_thread (void *param)
             {
                 /* LOG */
                 sbv_ota_abort_fw_upd ();
+                is_rcvd_metadata = SBV_FALSE;
                 continue;
             }
         }
@@ -677,6 +725,7 @@ sbv_ota_update_fw_thread (void *param)
             {
                 /* LOG */
                 sbv_ota_abort_fw_upd ();
+                is_rcvd_metadata = SBV_FALSE;
                 continue;
             }
 
@@ -685,6 +734,7 @@ sbv_ota_update_fw_thread (void *param)
             {
                 /* LOG */
                 sbv_ota_abort_fw_upd ();
+                is_rcvd_metadata = SBV_FALSE;
                 continue;
             }
         }
