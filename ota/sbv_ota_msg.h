@@ -165,6 +165,7 @@ typedef struct sbv_ota_msg_tx_instance_t
   uint8_t         is_updating;
   uint8_t         max_retry;
   uint8_t         is_ack;
+  uint8_t         is_abort;
 } sbv_ota_msg_tx_instance_t;
 
 typedef struct sbv_ota_msg_hw_cb_t

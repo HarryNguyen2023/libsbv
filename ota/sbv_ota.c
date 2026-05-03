@@ -626,6 +626,9 @@ sbv_ota_abort_fw_upd (void)
     sbv_ota_msg_rx_instance.is_update_enable        = SBV_TRUE;
     sbv_ota_msg_rx_instance.is_updating             = SBV_FALSE;
 
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.data_queue);
+
     sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
 
     sbv_rtos_event_group_set_bits(sbv_ota_event_group, SBV_OTA_RCV_ABORT);
@@ -654,6 +657,9 @@ sbv_ota_update_fw_thread (void *param)
 
     for(;;)
     {
+        // To protect against partial firmware update attack, we use a simple
+        // watchdog timer mechanism to abort the upate process if the next event
+        // does not arrive in time.
         tick_to_wait = sbv_ota_get_update_status() ? sbv_rtos_ms_to_tick(SBV_OTA_UPDATE_WATCHDOG_MS) : portMAX_DELAY;
 
         rcv_data_bits = sbv_rtos_event_group_wait_bits(sbv_ota_event_group,

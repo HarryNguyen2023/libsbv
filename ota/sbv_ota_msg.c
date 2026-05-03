@@ -312,11 +312,13 @@ void sbv_ota_handle_state (sbv_ota_state_t current_state, sbv_ota_state_t next_s
         || (next_state < SBV_OTA_STATE_IDLE || next_state >= SBV_OTA_STATE_MAX))
         return;
 
-    if (next_state == SBV_OTA_STATE_IDLE)
+    if (next_state == SBV_OTA_STATE_IDLE
+        || sbv_ota_msg_tx_instance.is_abort)
     {
         sbv_ota_msg_tx_instance.tx_state    = SBV_OTA_STATE_IDLE;
         sbv_ota_msg_tx_instance.next_state  = SBV_OTA_STATE_IDLE;
         sbv_ota_msg_tx_instance.is_updating = SBV_FALSE;
+        sbv_ota_msg_tx_instance.is_abort    = SBV_FALSE;
         return;
     }
 
@@ -603,12 +605,16 @@ sbv_ota_msg_rx_handle_cmd(uint8_t *data, uint32_t data_length)
     else if (cmd_pkt.cmd == SBV_OTA_CMD_ABORT)
     {
         /* LOG */
+        if (sbv_ota_msg_tx_instance.is_updating)
+            sbv_ota_msg_tx_instance.is_abort = SBV_TRUE;
     }
     else
     {
         /* LOG */
         goto ERR_EXIT;
     }
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
 
     return SBV_OK;
 
@@ -915,6 +921,8 @@ sbv_ota_msg_handle_resp(uint8_t *data, uint32_t data_length)
         /* LOG */
         return SBV_ERROR;
     }
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
 
     sbv_ota_msg_tx_instance.is_ack = (resp_pkt.status == SBV_OTA_ACK) ? SBV_TRUE : SBV_FALSE;
     return SBV_OK;
