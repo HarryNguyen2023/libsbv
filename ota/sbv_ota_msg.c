@@ -934,18 +934,110 @@ ERR_EXIT:
 }
 
 int
-sbv_ota_msg_resp_handle(uint8_t *data, const uint16_t data_length)
+sbv_ota_msg_handle_report(uint8_t *data, uint32_t data_length)
 {
-    int ret = SBV_OK;
+    int ret;
+    sbv_ota_report_pkt_t report_pkt;
+    uint32_t pkt_crc, new_crc;
 
     if(! data || ! data_length)
         return SBV_ERROR;
 
-    ret = sbv_ota_msg_handle_resp(data, data_length);
-    if (ret != SBV_OK)
+    memset(&report_pkt, 0, sizeof(sbv_ota_report_pkt_t));
+
+    sbv_rtos_mutex_lock(sbv_ota_msg_rx_instance.mutex);
+
+    ret = sbv_cqbuff_write (sbv_ota_msg_rx_instance.rx_queue, data, data_length);
+    if (ret != data_length)
     {
-        return ret;
+        /* LOG */
+        goto ERR_EXIT;
     }
 
+    if(sbv_cqbuff_get_size (sbv_ota_msg_rx_instance.rx_queue) < sizeof(sbv_ota_report_pkt_t))
+    {
+        sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+        return SBV_BUSY;
+    }
+
+    ret = sbv_cqbuff_read(sbv_ota_msg_rx_instance.rx_queue, &report_pkt, sizeof(sbv_ota_report_pkt_t));
+    if (ret != sizeof(sbv_ota_report_pkt_t))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if((report_pkt.sof != SBV_OTA_SOF) || (report_pkt.eof != SBV_OTA_EOF))
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if(report_pkt.packet_type != SBV_OTA_PACKET_TYPE_RESPONSE)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    pkt_crc         = report_pkt.crc;
+    report_pkt.crc  = 0;
+    new_crc         = sbv_ota_msg_crc_calculate((uint8_t *)&report_pkt, data_length);
+    if(pkt_crc != new_crc)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    // Save the report of the peer to filesystem
+
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+
     return SBV_OK;
+
+ERR_EXIT:
+    sbv_cqbuff_flush (sbv_ota_msg_rx_instance.rx_queue);
+    sbv_rtos_mutex_unlock(sbv_ota_msg_rx_instance.mutex);
+    return SBV_ERROR;
+}
+
+int
+sbv_ota_msg_resp_handle(uint8_t *data, const uint16_t data_length)
+{
+    int ret = SBV_OK;
+
+    if (!data || !data_length)
+        return SBV_ERROR;
+
+    // Basic packet validation: Check SOF and EOF
+    if (data[0] != SBV_OTA_SOF || data[data_length - 1] != SBV_OTA_EOF)
+    {
+        // Invalid packet structure
+        return SBV_ERROR;
+    }
+
+    // Extract packet type (assuming it's the second byte in all packet structs)
+    uint8_t packet_type = data[1];
+
+    // Delegate based on packet type
+    switch (packet_type)
+    {
+        case SBV_OTA_PACKET_TYPE_RESPONSE:
+            // Handle response packets (existing logic)
+            ret = sbv_ota_msg_handle_resp(data, data_length);
+            break;
+        case SBV_OTA_PACKET_TYPE_REPORT:
+            // Handle report packets
+            ret = sbv_ota_msg_handle_report(data, data_length);
+            break;
+        case SBV_OTA_PACKET_TYPE_CMD:
+            // Handle command packets (note: this may depend on rx_state)
+            ret = sbv_ota_msg_rx_handle_cmd(data, data_length);
+            break;
+        default:
+            // Unknown packet type
+            ret = SBV_ERROR;
+            break;
+    }
+
+    return ret;
 }
