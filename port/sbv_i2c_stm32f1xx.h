@@ -24,6 +24,7 @@ typedef struct sbv_i2c_instance_t
     sbv_i2c_handle_t*       i2c_handle;
     sbv_rtos_task_handle_t  i2c_rx_notify_task;
     uint16_t                i2c_rx_buffer_pos;
+    sbv_rtos_mutex_t        mutex;
 } sbv_i2c_instance_t;
 
 struct sbv_i2c_instance_list_t {

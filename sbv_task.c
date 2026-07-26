@@ -19,9 +19,8 @@
 /************************ Gloabal variables declaration ***************************/
 /* Static task objects */
 #define STACK_SIZE_BASE 256
-
-static StackType_t uart_rx_stack[STACK_SIZE_BASE];
-static StackType_t balance_crtl_stack[STACK_SIZE_BASE * 2];
+static sbv_rtos_stack_type_t uart_rx_stack[STACK_SIZE_BASE];
+static sbv_rtos_stack_type_t balance_crtl_stack[STACK_SIZE_BASE * 4];
 
 // sbv_rtos_task_handle_t sbv_debug_handle;
 sbv_rtos_task_handle_t sbv_uart_rx_handle;

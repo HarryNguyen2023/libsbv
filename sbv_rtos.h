@@ -32,7 +32,7 @@
 #define SBV_RTOS_FALSE          pdFALSE
 #define SBV_RTOS_TRUE           pdTRUE
 
-
+typedef StackType_t             sbv_rtos_stack_type_t;
 typedef SemaphoreHandle_t       sbv_rtos_mutex_t;
 typedef BaseType_t              sbv_rtos_base_type_t;
 typedef TickType_t              sbv_rtos_tick_type_t;

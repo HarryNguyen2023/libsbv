@@ -3,9 +3,6 @@
 #include "sbv_rtos.h"
 #include "sbv_i2c.h"
 
-sbv_rtos_mutex_t SBV_I2C_TX_BUFFER_MUTEX;
-sbv_rtos_mutex_t SBV_I2C_RX_BUFFER_MUTEX;
-
 sbv_i2c_hw_cb_t sbv_i2c_hw_cb = {
 #ifdef STM32F1xx
     .sbv_i2c_master_init        = sbv_i2c_stm32f1xx_master_init,

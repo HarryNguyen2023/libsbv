@@ -5,11 +5,15 @@
 #include "sbv_i2c_stm32f1xx.h"
 
 #ifdef STM32F1xx
-extern sbv_rtos_mutex_t SBV_I2C_RX_BUFFER_MUTEX;
-
 struct sbv_i2c_instance_list_t sbv_i2c_instance_list = {
     .list = {NULL, NULL}
 };
+
+#define SBV_I2C_RX_BUFFER_MUTEX_LOCK(Instance) \
+        sbv_rtos_mutex_lock(Instance->mutex)
+
+#define SBV_I2C_RX_BUFFER_MUTEX_UNLOCK(Instance) \
+        sbv_rtos_mutex_unlock(Instance->mutex)
 
 #define sbv_i2c_stm32f1xx_rx_hw_callback \
         HAL_I2C_MasterRxCpltCallback
@@ -70,7 +74,7 @@ sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t
     i2c_instance->i2c_rx_notify_task    = NULL;
 
     /* Create the mutex for the I2C RX FIFO */
-    sbv_rtos_mutex_create(SBV_I2C_RX_BUFFER_MUTEX);
+    sbv_rtos_mutex_create(i2c_instance->mutex);
 
     /* Initiate the tx and rx buffers */
     memset(i2c_instance->i2c_rx_buffer, 0, SBV_I2C_RX_BUFFER_SIZE);
@@ -146,7 +150,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
 
     tick_to_wait = SBV_I2C_RX_TIMEOUT;
 
-    SBV_I2C_RX_BUFFER_MUTEX_LOCK;
+    SBV_I2C_RX_BUFFER_MUTEX_LOCK(i2c_instance);
 
     i2c_instance->i2c_rx_notify_task = sbv_rtos_get_current_task_handle();
 
@@ -159,7 +163,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
     if (ret != SBV_OK)
     {
         // LOG
-        SBV_I2C_RX_BUFFER_MUTEX_UNLOCK;
+        SBV_I2C_RX_BUFFER_MUTEX_UNLOCK(i2c_instance);
         return SBV_ERROR;
     }
 
@@ -168,7 +172,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
 
     memcpy (received_buf, i2c_instance->i2c_rx_buffer, recv_size);
 
-    SBV_I2C_RX_BUFFER_MUTEX_UNLOCK;
+    SBV_I2C_RX_BUFFER_MUTEX_UNLOCK(i2c_instance);
 
     return recv_size;
 }

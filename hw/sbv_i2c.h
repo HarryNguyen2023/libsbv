@@ -17,12 +17,6 @@ typedef enum sbv_i2c_msg_t
 #define SBV_I2C_RX_TIMEOUT  2
 #define SBV_I2C_TX_TIMEOUT  10
 
-#define SBV_I2C_RX_BUFFER_MUTEX_LOCK \
-        sbv_rtos_mutex_lock(SBV_I2C_RX_BUFFER_MUTEX)
-
-#define SBV_I2C_RX_BUFFER_MUTEX_UNLOCK \
-        sbv_rtos_mutex_unlock(SBV_I2C_RX_BUFFER_MUTEX)
-
 typedef struct sbv_i2c_hw_cb_t
 {
     int (*sbv_i2c_master_init) (sbv_i2c_instance_t *, sbv_i2c_handle_t *);
