@@ -3,6 +3,7 @@
 #include "sbv_motor.h"
 
 #define SBV_MAX_ENCODER_VALUE   (65535 / 4)
+#define SBV_ENCODER_ROLLOVER_THRESHOLD   16000
 
 void
 sbv_motor_init(sbv_motor_t *motor)
@@ -80,13 +81,13 @@ sbv_motor_get_speed(sbv_motor_t *motor)
 
     /* Avoid counter overflow */
     if(motor->dir == SBV_MOTOR_DIR_CW && (motor->encoder_pos < motor->prev_encoder_pos)
-       && (motor->prev_encoder_pos - motor->encoder_pos > 16000))
+       && (motor->prev_encoder_pos - motor->encoder_pos > SBV_ENCODER_ROLLOVER_THRESHOLD))
     {
         motor->encoder_shift = SBV_MAX_ENCODER_VALUE - motor->prev_encoder_pos;
         motor->encoder_shift += motor->encoder_pos;
     }
     else if(motor->dir == SBV_MOTOR_DIR_CCW && (motor->encoder_pos > motor->prev_encoder_pos)
-            && (motor->encoder_pos - motor->prev_encoder_pos > 16000))
+            && (motor->encoder_pos - motor->prev_encoder_pos > SBV_ENCODER_ROLLOVER_THRESHOLD))
     {
         motor->encoder_shift = motor->encoder_pos - SBV_MAX_ENCODER_VALUE;
         motor->encoder_shift -= motor->prev_encoder_pos;

@@ -74,8 +74,8 @@ typedef EventBits_t             sbv_rtos_event_bits_t;
 #define sbv_rtos_port_yield_fromISR(H)  \
         portYIELD_FROM_ISR(H)
 
-#define sbv_rtos_task_create(Function, Name, Stack_depth, Param, Priority, TaskHandle)  \
-        xTaskCreate(Function, Name, Stack_depth, Param, Priority, TaskHandle)
+#define sbv_rtos_task_create(Function, Name, Stack_depth, Param, Priority, Stack_buffer, TaskHandle)  \
+        xTaskCreateStatic(Function, Name, Stack_depth, Param, Priority, Stack_buffer, TaskHandle)
 
 #define sbv_rtos_task_delete(Task_handle)  \
         vTaskDelete(Task_handle)

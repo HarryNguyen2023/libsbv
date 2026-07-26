@@ -8,20 +8,18 @@
 
 #define SBV_ROBOT_WHEEL_DIAMETER     (62)
 #define SBV_ROBOT_WHEEL_DISTANCE     (200)
-
-sbv_control_balance_t   sbv_control_balance;
-sbv_imu_instance_t      sbv_imu_instance;
-
 void
-sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_i2c_handle_t *i2c_handle)
+sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_imu_instance_t *imu_instance,
+                         sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
 {
-    if(!sbv_ctrl_balance || !i2c_handle)
+    if(! sbv_ctrl_balance || ! i2c_instance || ! i2c_handle)
         return;
 
-    sbv_control_robot_speed_init(&(sbv_ctrl_balance->sbv_control_speed), SBV_ROBOT_WHEEL_DIAMETER, SBV_ROBOT_WHEEL_DISTANCE);
+    sbv_control_robot_speed_init(&(sbv_ctrl_balance->sbv_control_speed),
+                                SBV_ROBOT_WHEEL_DIAMETER, SBV_ROBOT_WHEEL_DISTANCE);
 
-    sbv_imu_init(i2c_handle, &sbv_imu_instance, BALANCE_PID_SAMPLING_TIME);
-    sbv_ctrl_balance->imu = &sbv_imu_instance;
+    sbv_imu_init(i2c_instance, i2c_handle, imu_instance, BALANCE_PID_SAMPLING_TIME);
+    sbv_ctrl_balance->imu = imu_instance;
 
     /*
      * Since the balance control require the fast reponse, but not absolutely

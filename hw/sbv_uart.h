@@ -21,41 +21,24 @@ typedef enum sbv_uart_baudrate_t
 #include "sbv_uart_esp32s3.h"
 #endif
 
-#define SBV_UART_TX_BUFFER_MUTEX_LOCK \
-        sbv_rtos_mutex_lock(SBV_UART_TX_BUFFER_MUTEX)
-
-#define SBV_UART_TX_BUFFER_MUTEX_UNLOCK \
-        sbv_rtos_mutex_unlock(SBV_UART_TX_BUFFER_MUTEX)
-
-#define SBV_UART_RX_BUFFER_MUTEX_LOCK \
-        sbv_rtos_mutex_lock(SBV_UART_RX_BUFFER_MUTEX)
-
-#define SBV_UART_RX_BUFFER_MUTEX_UNLOCK \
-        sbv_rtos_mutex_unlock(SBV_UART_RX_BUFFER_MUTEX)
-
 struct sbv_uart_hw_cb_t
 {
-    void (*sbv_uart_init) (void *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t);
-    int (*sbv_uart_tx_send_data) (sbv_uart_handle_t *, uint8_t *, uint16_t, uint16_t);
-    uint8_t* (*sbv_uart_rx_rcv_data) (uint16_t *, uint16_t);
-    int (*sbv_uart_rx_read_data) (uint8_t *, int);
-    int (*sbv_uart_register_rx_cb) (int (*uart_rx_cb)(uint8_t *, const uint16_t));
+    sbv_uart_instance_t* (*sbv_uart_init) (void *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t);
+    int (*sbv_uart_tx_send_data) (sbv_uart_instance_t *, uint8_t *, uint16_t, uint16_t);
+    uint8_t* (*sbv_uart_rx_rcv_data) (sbv_uart_instance_t *, uint16_t *, uint16_t);
+    int (*sbv_uart_register_rx_cb) (sbv_uart_instance_t *, int (*uart_rx_cb)(uint8_t *, const uint16_t));
 };
 
-void
+sbv_uart_instance_t *
 sbv_uart_init (void *uart_pin, sbv_uart_handle_t* uart_handle,
                sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate);
 int
-sbv_uart_tx_send_data(uint8_t* uart_tx_data, uint16_t uart_tx_size, uint16_t timeout_ms);
+sbv_uart_tx_send_data(sbv_uart_instance_t *, uint8_t* uart_tx_data, uint16_t uart_tx_size, uint16_t timeout_ms);
 uint8_t *
-sbv_uart_rx_rcv_data (uint16_t *size, uint16_t timeout_ms);
+sbv_uart_rx_rcv_data (sbv_uart_instance_t *, uint16_t *size, uint16_t timeout_ms);
 int
-sbv_uart_rx_read_data (uint8_t *data, int size);
-void
-sbv_uart_send_debug (uint8_t *data, uint16_t data_length, uint16_t timeout_ms);
+sbv_uart_register_rx_cb (sbv_uart_instance_t *, int (*uart_rx_cb)(uint8_t *, const uint16_t));
 int
-sbv_uart_register_rx_cb (int (*uart_rx_cb)(uint8_t *, const uint16_t));
-int
-sbv_uart_send_ota_data (uint8_t type, uint8_t* data, uint16_t length, uint16_t timeout_ms);
+sbv_uart_send_ota_data (sbv_uart_instance_t *, uint8_t type, uint8_t* data, uint16_t length, uint16_t timeout_ms);
 
 #endif /*SBV_UART_H*/

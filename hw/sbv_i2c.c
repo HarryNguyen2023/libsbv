@@ -14,29 +14,33 @@ sbv_i2c_hw_cb_t sbv_i2c_hw_cb = {
 #endif /* STM32F1xx */
 };
 
-void
-sbv_i2c_master_init(sbv_i2c_handle_t *i2c_handle)
+int
+sbv_i2c_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
 {
     if (sbv_i2c_hw_cb.sbv_i2c_master_init)
-        (sbv_i2c_hw_cb.sbv_i2c_master_init) (i2c_handle);
+        (sbv_i2c_hw_cb.sbv_i2c_master_init) (i2c_instance, i2c_handle);
+
+    return SBV_ERROR;
 }
 
 int
-sbv_i2c_master_send_data(uint8_t slave_add, sbv_i2c_msg_t msg_type,
-                         uint8_t* i2c_tx_data, uint16_t i2c_tx_size)
+sbv_i2c_master_send_data(sbv_i2c_instance_t *i2c_instance,
+                        uint8_t slave_add, sbv_i2c_msg_t msg_type,
+                        uint8_t* i2c_tx_data, uint16_t i2c_tx_size)
 {
     if (sbv_i2c_hw_cb.sbv_i2c_master_send_data)
-        return (sbv_i2c_hw_cb.sbv_i2c_master_send_data) (slave_add, msg_type,
+        return (sbv_i2c_hw_cb.sbv_i2c_master_send_data) (i2c_instance, slave_add, msg_type,
                                                         i2c_tx_data, i2c_tx_size);
-    return 0;
+    return SBV_ERROR;
 }
 
-uint8_t*
-sbv_i2c_master_rcv_data (uint8_t slave_add, uint16_t *size)
+int
+sbv_i2c_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t slave_add,
+                        uint8_t received_buf[], uint16_t size)
 {
     if (sbv_i2c_hw_cb.sbv_i2c_master_rcv_data)
-        return (sbv_i2c_hw_cb.sbv_i2c_master_rcv_data) (slave_add, size);
+        return (sbv_i2c_hw_cb.sbv_i2c_master_rcv_data) (i2c_instance, slave_add,
+                                                        received_buf, size);
 
-    *size = 0;
-    return NULL;
+    return SBV_ERROR;
 }

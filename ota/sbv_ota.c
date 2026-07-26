@@ -34,6 +34,10 @@ uint8_t fw_pages[SBV_OTA_PAGES_SIZE];
 
 void sbv_ota_update_fw_thread (void *param);
 
+#define STACK_SIZE 512
+
+static StackType_t ota_crtl_stack[STACK_SIZE * 2];
+
 void
 sbv_ota_update_init(void)
 {
@@ -54,7 +58,7 @@ sbv_ota_update_init(void)
     }
 
     sbv_rtos_task_create(sbv_ota_update_fw_thread, "update_fw", 512,
-                         NULL, SBV_OTA_UPDATE_FW_PRIO, &sbv_ota_update_fw_handle);
+                         NULL, SBV_OTA_UPDATE_FW_PRIO, ota_crtl_stack, &sbv_ota_update_fw_handle);
 }
 
 void

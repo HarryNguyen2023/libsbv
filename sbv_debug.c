@@ -18,7 +18,22 @@ sbv_debug_tx_t sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
 char tx_logging_buffer[100];
 
 extern sbv_control_balance_t sbv_control_balance;
-extern sbv_uart_handle_t     huart1;
+
+struct sbv_debug_interface_t {
+    sbv_uart_instance_t *uart_instance;
+};
+
+struct sbv_debug_interface_t sbv_debug_interface = {0};
+
+uint8_t
+sbv_debug_set_uart_interface (sbv_uart_instance_t *uart_instance)
+{
+    if (! uart_instance)
+        return -1;
+
+    sbv_debug_interface.uart_instance = uart_instance;
+    return 0;
+}
 
 static void
 sbv_debug_set_command_handle(void);
@@ -318,7 +333,8 @@ sbv_debug_tx_encoder(void)
             sbv_motor_read_encoder((sbv_control_balance.sbv_control_speed.motor_left.motor)),
             sbv_motor_read_encoder((sbv_control_balance.sbv_control_speed.motor_right.motor)));
 
-    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
+    sbv_uart_tx_send_data(sbv_debug_interface.uart_instance, (uint8_t*)tx_logging_buffer,
+                          strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
 }
 
 static void
@@ -332,7 +348,8 @@ sbv_debug_tx_imu(void)
             sbv_control_balance.imu->phi.est_sensor,
             sbv_control_balance.imu->phi.est_post);
 
-    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
+    sbv_uart_tx_send_data(sbv_debug_interface.uart_instance, (uint8_t*)tx_logging_buffer,
+                          strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
 }
 
 static void
@@ -367,7 +384,8 @@ sbv_debug_tx_pid(void)
             pid->target, pid->feedback, pid->output,
             pid->Kp, pid->Ki, pid->Kd);
 
-    sbv_uart_tx_send_data((uint8_t*)tx_logging_buffer, strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
+    sbv_uart_tx_send_data(sbv_debug_interface.uart_instance, (uint8_t*)tx_logging_buffer,
+                          strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
 }
 
 void

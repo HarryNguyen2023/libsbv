@@ -13,7 +13,8 @@ typedef struct sbv_control_balance_t
 } sbv_control_balance_t;
 
 void
-sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_i2c_handle_t *i2c_handle);
+sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_imu_instance_t *imu_instance,
+                         sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle);
 void
 sbv_control_balance_update(sbv_control_balance_t *sbv_ctrl_balance);
 

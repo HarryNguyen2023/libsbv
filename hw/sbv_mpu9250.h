@@ -29,9 +29,12 @@
 #define SBV_MPU9250_REG_GYRO_ZOUT_H     (0x47)
 #define SBV_MPU9250_REG_GYRO_ZOUT_L     (0x48)
 
-void
-sbv_mpu9250_init(sbv_i2c_handle_t *i2c_handle);
-void
-sbv_mpu9250_read(sbv_imu_gyroscope_t *gyro, sbv_imu_accelerometer_t *accel);
+#define SBV_MPU_9250_MAX_WRITE_TRY      (5)
+
+int
+sbv_mpu9250_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle);
+int
+sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
+                 sbv_imu_gyroscope_t *gyro, sbv_imu_accelerometer_t *accel);
 
 #endif /*SBV_MPU9250_H*/

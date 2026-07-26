@@ -43,12 +43,15 @@ typedef struct sbv_imu_instance_t
     float                       process_noise;
     float                       measure_variance;
     uint16_t                    sampling_time_ms;
-    sbv_i2c_handle_t            *i2c_handle;
+    sbv_imu_gyroscope_t         sbv_imu_gyro;
+    sbv_imu_accelerometer_t     sbv_imu_acc;
+    sbv_i2c_instance_t          *i2c_instance;
 } sbv_imu_instance_t;
 
-void
-sbv_imu_init (sbv_i2c_handle_t *i2c_handle, sbv_imu_instance_t *imu_instance, float sampling_time_ms);
-void
+int
+sbv_imu_init (sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle,
+              sbv_imu_instance_t *imu_instance, float sampling_time_ms);
+int
 sbv_imu_kalman_update (sbv_imu_instance_t *imu_instance);
 
 #endif /*SBV_IMU_H*/

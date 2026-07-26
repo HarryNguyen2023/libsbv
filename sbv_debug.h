@@ -79,6 +79,8 @@ typedef enum sbv_debug_tx_t
     SBV_DEBUG_TX_BALANCE_PID
 } sbv_debug_tx_t;
 
+uint8_t
+sbv_debug_set_uart_interface (sbv_uart_instance_t *uart_instance);
 void
 sbv_debug_command_handle(char* rcv_buffer, uint16_t size);
 void
