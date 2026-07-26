@@ -23,19 +23,19 @@ typedef enum sbv_uart_baudrate_t
 
 struct sbv_uart_hw_cb_t
 {
-    sbv_uart_instance_t* (*sbv_uart_init) (void *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t);
+    sbv_uart_instance_t* (*sbv_uart_init) (sbv_uart_instance_t *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t);
     int (*sbv_uart_tx_send_data) (sbv_uart_instance_t *, uint8_t *, uint16_t, uint16_t);
-    uint8_t* (*sbv_uart_rx_rcv_data) (sbv_uart_instance_t *, uint16_t *, uint16_t);
+    uint8_t* (*sbv_uart_rx_rcv_data) (sbv_uart_instance_t *, uint8_t[], uint16_t, uint16_t);
     int (*sbv_uart_register_rx_cb) (sbv_uart_instance_t *, int (*uart_rx_cb)(uint8_t *, const uint16_t));
 };
 
-sbv_uart_instance_t *
-sbv_uart_init (void *uart_pin, sbv_uart_handle_t* uart_handle,
+int
+sbv_uart_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* uart_handle,
                sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate);
 int
 sbv_uart_tx_send_data(sbv_uart_instance_t *, uint8_t* uart_tx_data, uint16_t uart_tx_size, uint16_t timeout_ms);
-uint8_t *
-sbv_uart_rx_rcv_data (sbv_uart_instance_t *, uint16_t *size, uint16_t timeout_ms);
+int
+sbv_uart_rx_rcv_data (sbv_uart_instance_t* uart_instance, uint8_t recv_buff[], uint16_t size, uint16_t timeout_ms);
 int
 sbv_uart_register_rx_cb (sbv_uart_instance_t *, int (*uart_rx_cb)(uint8_t *, const uint16_t));
 int

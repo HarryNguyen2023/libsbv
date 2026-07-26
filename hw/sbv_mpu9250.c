@@ -14,6 +14,10 @@
 #define SBV_MPU9250_CFG_MSG_SIZE        2
 #define SBV_MPU9250_RCV_MSG_SIZE        14
 
+#define SBV_MPU9250_CFG_I2C_TIMEOUT     10
+#define SBV_MPU9250_REQ_I2C_TIMEOUT     2
+#define SBV_MPU9250_RCV_I2C_TIMEOUT     10
+
 uint8_t sbv_mpu_cfg_buffer[SBV_MPU9250_CFG_MSG_SIZE];
 uint8_t sbv_mpu_rcv_buffer[SBV_MPU9250_RCV_MSG_SIZE];
 
@@ -35,23 +39,23 @@ sbv_mpu9250_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
     sbv_i2c_master_init (i2c_instance, i2c_handle);
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_PWR_MGMT_1, SBV_MPU9250_PWR_CONFIG);
     sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE);
+                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_CONFIG, SBV_MPU9250_GENERAL_CONFIG);
     sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE);
+                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_GYRO_CONFIG, SBV_MPU9250_GYRO_CONFIG);
     sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE);
+                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_ACCEL_CONFIG, SBV_MPU9250_ACCEL_CONFIG);
     sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE);
+                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_ACCEL_CONFIG_2, SBV_MPU9250_ACCEL_CONFIG_2);
     sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE);
+                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
 
     return SBV_OK;
 }
@@ -92,7 +96,8 @@ sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
     while (try_num++ < SBV_MPU_9250_MAX_WRITE_TRY)
     {
         ret = sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_READ,
-                                       (uint8_t*) SBV_MPU9250_REG_ACCEL_XOUT_H, 1);
+                                       (uint8_t*) SBV_MPU9250_REG_ACCEL_XOUT_H, 1,
+                                       SBV_MPU9250_REQ_I2C_TIMEOUT);
         if (ret == SBV_OK)
             break;
     }
@@ -106,7 +111,8 @@ sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
 
     /* Read all 14 bytes of data (6 Accel bytes, 2 Temp bytes and 6 Gyro bytes) */
     recv_byte = sbv_i2c_master_rcv_data (i2c_instance, SBV_MPU9250_I2C_ADDR,
-                                        sbv_mpu_rcv_buffer, SBV_MPU9250_RCV_MSG_SIZE);
+                                        sbv_mpu_rcv_buffer, SBV_MPU9250_RCV_MSG_SIZE,
+                                        SBV_MPU9250_RCV_I2C_TIMEOUT);
     if (recv_byte <= 0)
     {
         // LOG

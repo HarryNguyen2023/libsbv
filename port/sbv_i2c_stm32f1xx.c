@@ -5,9 +5,7 @@
 #include "sbv_i2c_stm32f1xx.h"
 
 #ifdef STM32F1xx
-struct sbv_i2c_instance_list_t sbv_i2c_instance_list = {
-    .list = {NULL, NULL}
-};
+struct sbv_i2c_instance_list_t sbv_i2c_instance_list = {0};
 
 #define SBV_I2C_RX_BUFFER_MUTEX_LOCK(Instance) \
         sbv_rtos_mutex_lock(Instance->mutex)
@@ -85,20 +83,21 @@ sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t
 /* Transmit a single I2C packet to the target slave using the HAL master transmit API. */
 static int
 sbv_i2c_stm32f1xx_master_tx_send_pkt (sbv_i2c_handle_t* i2c_handle, uint8_t slave_add,
-                                      sbv_i2c_msg_t msg_type, uint8_t* i2c_tx_data, uint16_t i2c_tx_size)
+                                      sbv_i2c_msg_t msg_type, uint8_t* i2c_tx_data,
+                                      uint16_t i2c_tx_size, uint16_t timeout_ms)
 {
     if(! i2c_handle || ! i2c_tx_data)
         return SBV_ERROR;
 
     return HAL_I2C_Master_Transmit (i2c_handle, ((slave_add << 0x1) | msg_type),
-                                    i2c_tx_data, i2c_tx_size, SBV_I2C_TX_TIMEOUT);
+                                    i2c_tx_data, i2c_tx_size, timeout_ms);
 }
 
 /* Send data from a configured I2C instance to a slave device. */
 int
-sbv_i2c_stm32f1xx_master_send_data (sbv_i2c_instance_t *i2c_instance,
-                                    uint8_t slave_add, sbv_i2c_msg_t msg_type,
-                                    uint8_t* i2c_tx_data, uint16_t i2c_tx_size)
+sbv_i2c_stm32f1xx_master_send_data (sbv_i2c_instance_t *i2c_instance, uint8_t slave_add,
+                                    sbv_i2c_msg_t msg_type, uint8_t* i2c_tx_data,
+                                    uint16_t i2c_tx_size, uint16_t timeout_ms)
 {
     int ret = SBV_OK;
 
@@ -106,7 +105,7 @@ sbv_i2c_stm32f1xx_master_send_data (sbv_i2c_instance_t *i2c_instance,
         return SBV_ERROR;
 
     ret = sbv_i2c_stm32f1xx_master_tx_send_pkt (i2c_instance->i2c_handle, slave_add,
-                                                msg_type, i2c_tx_data, i2c_tx_size);
+                                                msg_type, i2c_tx_data, i2c_tx_size, timeout_ms);
     if (ret != SBV_OK)
         return SBV_ERROR;
 
@@ -140,7 +139,7 @@ sbv_i2c_stm32f1xx_rx_hw_callback(sbv_i2c_handle_t* i2c_handle)
 /* Receive data from a slave using DMA and copy it into the caller buffer. */
 int
 sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t slave_add,
-                                   uint8_t received_buf[], uint16_t size)
+                                   uint8_t received_buf[], uint16_t size, uint16_t timeout_ms)
 {
     sbv_rtos_tick_type_t tick_to_wait;
     int recv_size = 0, ret = SBV_OK;
@@ -148,7 +147,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
     if (! i2c_instance || ! received_buf)
         return SBV_ERROR;
 
-    tick_to_wait = SBV_I2C_RX_TIMEOUT;
+    tick_to_wait = sbv_rtos_ms_to_tick(timeout_ms);
 
     SBV_I2C_RX_BUFFER_MUTEX_LOCK(i2c_instance);
 
