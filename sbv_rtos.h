@@ -83,6 +83,9 @@ typedef EventBits_t             sbv_rtos_event_bits_t;
 #define sbv_rtos_task_delay(T)  \
         vTaskDelay(T)
 
+#define sbv_rtos_task_delay_until(T, D)  \
+        vTaskDelayUntil((T), (D))
+
 #define sbv_rtos_start_task_scheduler()  \
         vTaskStartScheduler()
 

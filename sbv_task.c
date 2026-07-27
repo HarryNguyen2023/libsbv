@@ -22,7 +22,6 @@
 static sbv_rtos_stack_type_t debug_stack[STACK_SIZE_BASE];
 static sbv_rtos_stack_type_t balance_crtl_stack[STACK_SIZE_BASE * 4];
 
-// sbv_rtos_task_handle_t sbv_debug_handle;
 sbv_rtos_task_handle_t sbv_debug_handle;
 sbv_rtos_task_handle_t sbv_balance_ctrl_handle;
 
@@ -68,7 +67,7 @@ sbv_task_init(void)
     sbv_rtos_task_create(sbv_task_balance_control, "balance_ctrl", STACK_SIZE_BASE * 4,
                         NULL, 4, balance_crtl_stack, &sbv_balance_ctrl_handle);
 
-    // sbv_rtos_start_task_scheduler();
+    sbv_rtos_start_task_scheduler();
 }
 
 /*
@@ -77,28 +76,30 @@ sbv_task_init(void)
 void
 sbv_task_balance_control(void *param)
 {
-    uint32_t start_tick;
     uint16_t balance_update_period_ms;
+    sbv_rtos_tick_type_t balance_update_period_ticks;
     sbv_rtos_tick_type_t speed_update_delay_ticks;
 
-    /* Record the initial tick so the control loop can run at a fixed sample interval. */
-    start_tick = sbv_rtos_get_tick();
     /* Use the balance controller sampling period as the main update interval. */
     balance_update_period_ms = sbv_control_balance.balance_pid.sampling_time_ms;
+    balance_update_period_ticks = sbv_rtos_ms_to_tick(balance_update_period_ms);
     /* Delay between speed/twist updates follows the steering PID sampling period. */
     speed_update_delay_ticks = sbv_rtos_ms_to_tick(sbv_control_balance.sbv_control_speed.steering_pid.sampling_time_ms);
 
     for(;;)
     {
-        /* Run the speed/twist controller repeatedly until the sampling window expires. */
-        while (sbv_rtos_get_tick() - start_tick < sbv_rtos_ms_to_tick(balance_update_period_ms))
+        sbv_rtos_tick_type_t balance_deadline_tick = sbv_rtos_get_tick() + balance_update_period_ticks;
+        sbv_rtos_tick_type_t speed_wake_tick = sbv_rtos_get_tick();
+
+        /* Run the speed/twist controller on a fixed cadence until the balance window expires. */
+        while (sbv_rtos_get_tick() < balance_deadline_tick)
         {
             sbv_control_robot_speed_twist_update(&(sbv_control_balance.sbv_control_speed));
-            sbv_rtos_task_delay(speed_update_delay_ticks);
+            sbv_rtos_task_delay_until(&speed_wake_tick, speed_update_delay_ticks);
         }
-        /* Once the interval has elapsed, update balance control and restart the timing window. */
+
+        /* Once the interval has elapsed, update balance control and start the next window. */
         sbv_control_balance_update(&sbv_control_balance);
-        start_tick = sbv_rtos_get_tick();
     }
 }
 
@@ -110,9 +111,11 @@ sbv_task_debug_console_task(void *param)
 {
     uint32_t start_tick;
     uint8_t debug_streaming_delay_ms = 500;
-    uint8_t uart_rcv_sampling_ms     = 100;
-    uint8_t uart_rx_timeout_ms       = 10;
+    uint8_t uart_rcv_sampling_ms     = 10;
+    uint8_t uart_rx_timeout_ms       = 90;
 
+    /* Record the initial tick so the control loop can run at a fixed sample interval. */
+    start_tick = sbv_rtos_get_tick();
     /* Register callback function to handle UART rx */
     sbv_uart_register_rx_cb (&sbv_uart_1, sbv_debug_command_handle);
 
