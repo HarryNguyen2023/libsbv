@@ -77,19 +77,19 @@ sbv_debug_break_command(char* rcv_buffer, uint16_t size)
     }
 }
 
-void
-sbv_debug_command_handle(char* rcv_buffer, uint16_t size)
+int
+sbv_debug_command_handle(char* rcv_buffer, const uint16_t size)
 {
-    uint8_t first_command;
+    uint8_t first_command, command_size;
 
     if(!rcv_buffer || size == 0)
         return;
 
-    size = (size < SBV_DEBUG_COMMAND_MAX_LEN) ? size : SBV_DEBUG_COMMAND_MAX_LEN;
-    memcpy(rx_command_buffer, rcv_buffer, size);
+    command_size = (size < SBV_DEBUG_COMMAND_MAX_LEN) ? size : SBV_DEBUG_COMMAND_MAX_LEN;
+    memcpy(rx_command_buffer, rcv_buffer, command_size);
     rx_command_buffer[SBV_DEBUG_COMMAND_MAX_LEN] = '\0';
 
-    sbv_debug_break_command(rx_command_buffer, size);
+    sbv_debug_break_command(rx_command_buffer, command_size);
 
     if((strlen(rcv_command[0]) != 1) || (strlen(rcv_command[1]) != 1))
     {
