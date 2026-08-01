@@ -12,10 +12,14 @@
 #include "sbv_debug.h"
 
 #define SBV_DEBUG_TX_TIMEOUT_MS     (5)
+#define SBV_DEBUG_COMMAND_MAX_LEN   (22)
+#define SBV_DEBUG_MAX_COMMAND_SLOT  (7)
+#define SBV_DEBUG_MAX_LEN_PER_SLOT  (4)
 
-char rcv_command[7][5];
+char rcv_command[SBV_DEBUG_MAX_COMMAND_SLOT][SBV_DEBUG_MAX_LEN_PER_SLOT + 1];
 sbv_debug_tx_t sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
 char tx_logging_buffer[100];
+char rx_command_buffer[SBV_DEBUG_COMMAND_MAX_LEN + 1];
 
 extern sbv_control_balance_t sbv_control_balance;
 
@@ -47,24 +51,28 @@ sbv_debug_reset_command_handle(void);
 static void
 sbv_debug_break_command(char* rcv_buffer, uint16_t size)
 {
-    uint8_t i = 0, max_idx = sizeof(rcv_command) / sizeof(rcv_command[0]);
+    uint8_t i = 0, max_idx, token_size;
     char *token;
     char *saveptr;
 
     if(!rcv_buffer || size == 0)
         return;
 
+    max_idx = sizeof(rcv_command) / sizeof(rcv_command[0]);
     memset(rcv_command, 0, sizeof(rcv_command));
 
     token = strtok_r(rcv_buffer, " ", &saveptr);
 
     while (token != NULL) 
     {
-        strcpy(rcv_command[i++], token);
+        token_size = (strlen(token) <= SBV_DEBUG_MAX_LEN_PER_SLOT) \
+                        ? strlen(token) : SBV_DEBUG_MAX_LEN_PER_SLOT;
+        memcpy(rcv_command[i], token, token_size);
+        rcv_command[i][SBV_DEBUG_MAX_LEN_PER_SLOT] = '\0';
         token = strtok_r(NULL, " ", &saveptr);
 
         /* Avoid buffer overflow */
-        if(i == max_idx)
+        if(++i == max_idx)
             break;
     }
 }
@@ -77,7 +85,11 @@ sbv_debug_command_handle(char* rcv_buffer, uint16_t size)
     if(!rcv_buffer || size == 0)
         return;
 
-    sbv_debug_break_command(rcv_buffer, size);
+    size = (size < SBV_DEBUG_COMMAND_MAX_LEN) ? size : SBV_DEBUG_COMMAND_MAX_LEN;
+    memcpy(rx_command_buffer, rcv_buffer, size);
+    rx_command_buffer[SBV_DEBUG_COMMAND_MAX_LEN] = '\0';
+
+    sbv_debug_break_command(rx_command_buffer, size);
 
     if((strlen(rcv_command[0]) != 1) || (strlen(rcv_command[1]) != 1))
     {
