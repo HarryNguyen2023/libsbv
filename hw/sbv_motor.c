@@ -101,14 +101,12 @@ sbv_motor_get_speed(sbv_motor_t *motor)
 }
 
 static void
-sbv_motor_pwm_update(sbv_motor_t *motor)
+sbv_motor_pwm_update(sbv_motor_t *motor, uint16_t pwm_duty_cycle)
 {
-    uint16_t pwm_duty_cycle;
-
     if(! motor)
         return;
 
-    pwm_duty_cycle = motor->pwm_output;
+    motor->pwm_output = pwm_duty_cycle;
 
 #ifdef STM32F1xx
     switch (motor->pwm_channel)
@@ -142,7 +140,6 @@ sbv_motor_output_update(sbv_motor_t *motor, int16_t duty_cycle)
     if(duty_cycle == 0)
     {
         sbv_motor_brake(motor);
-        motor->pwm_output = 0;
         return;
     }
     else if(duty_cycle > 0)
@@ -159,8 +156,7 @@ sbv_motor_output_update(sbv_motor_t *motor, int16_t duty_cycle)
     duty_cycle_output = (duty_cycle > 0) ? duty_cycle : -(duty_cycle);
     duty_cycle_output = (duty_cycle_output < motor->max_pwm) \
                             ? duty_cycle_output : motor->max_pwm;
-    motor->pwm_output = duty_cycle_output;
-    sbv_motor_pwm_update(motor);
+    sbv_motor_pwm_update(motor, duty_cycle_output);
 }
 
 void
@@ -169,7 +165,7 @@ sbv_motor_brake(sbv_motor_t *motor)
     if(! motor)
         return;
 
-    sbv_motor_pwm_update(motor);
+    sbv_motor_pwm_update(motor, 0);
 
     sbv_gpio_set_pin(motor->motor_ports[0], motor->motor_pin[0], SBV_GPIO_PIN_LOW);
     sbv_gpio_set_pin(motor->motor_ports[1], motor->motor_pin[1], SBV_GPIO_PIN_LOW);
