@@ -72,8 +72,9 @@ sbv_control_robot_speed_init(sbv_control_robot_speed_t *sbv_speed_ctrl, float wh
      * Here we add a PD loop to control the steering of the robot
      * due to the inreliability of the robot mechanical system in reality
      */
-    sbv_pid_init(&(sbv_speed_ctrl->steering_pid), STEERING_PID_MAX_OUTPUT,
-                0, STERRING_PID_KP, 0, STEERING_PID_KD, STEERING_PID_SAMPLING_TIME);
+    sbv_pid_init(&(sbv_speed_ctrl->steering_pid),
+                STEERING_PID_MAX_OUTPUT, STEERING_PID_MIN_OUTPUT,
+                STERRING_PID_KP, 0, STEERING_PID_KD, STEERING_PID_SAMPLING_TIME);
 }
 
 static void

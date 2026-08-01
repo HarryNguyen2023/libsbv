@@ -25,7 +25,8 @@ sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_imu_instan
      * Since the balance control require the fast reponse, but not absolutely
      * correct upright angle, we will use the PD controller for balance control
      */
-    sbv_pid_init(&(sbv_ctrl_balance->balance_pid), BALANCE_PID_MAX_OUTPUT, 0,
+    sbv_pid_init(&(sbv_ctrl_balance->balance_pid),
+                BALANCE_PID_MAX_OUTPUT, BALANCE_PID_MIN_OUTPUT,
                 BALANCE_PID_KP, 0, BALANCE_PID_KD, BALANCE_PID_SAMPLING_TIME);
 }
 

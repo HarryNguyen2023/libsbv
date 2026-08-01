@@ -11,12 +11,14 @@
 
 #define STERRING_PID_KP             100
 #define STEERING_PID_KD             0.6
-#define STEERING_PID_MAX_OUTPUT     500
+#define STEERING_PID_MIN_OUTPUT     -200
+#define STEERING_PID_MAX_OUTPUT     200
 #define STEERING_PID_SAMPLING_TIME  20
 
 #define BALANCE_PID_KP              100
 #define BALANCE_PID_KD              0.6
-#define BALANCE_PID_MAX_OUTPUT      500
+#define BALANCE_PID_MIN_OUTPUT      -200
+#define BALANCE_PID_MAX_OUTPUT      200
 #define BALANCE_PID_SAMPLING_TIME   80
 
 #endif /* __SBV_CONTROL_CFG_H__ */
