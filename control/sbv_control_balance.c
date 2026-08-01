@@ -12,7 +12,7 @@ void
 sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_imu_instance_t *imu_instance,
                          sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
 {
-    if(! sbv_ctrl_balance || ! i2c_instance || ! i2c_handle)
+    if(! sbv_ctrl_balance || ! imu_instance || ! i2c_instance || ! i2c_handle)
         return;
 
     sbv_control_robot_speed_init(&(sbv_ctrl_balance->sbv_control_speed),
@@ -33,8 +33,6 @@ sbv_control_balance_init(sbv_control_balance_t *sbv_ctrl_balance, sbv_imu_instan
 void
 sbv_control_balance_update(sbv_control_balance_t *sbv_ctrl_balance)
 {
-    float left_motor_output, right_motor_output;
-
     if (! sbv_ctrl_balance || ! (sbv_ctrl_balance->imu))
         return;
 

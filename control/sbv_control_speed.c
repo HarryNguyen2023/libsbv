@@ -82,7 +82,7 @@ sbv_control_motor_speed_input_handle(sbv_control_motor_speed_t *motor_speed, flo
 {
     float motor_max_rps;
 
-    if(! motor_speed || ! motor_speed->motor || ! speed_rps)
+    if(! motor_speed || ! motor_speed->motor)
         return;
 
     motor_max_rps = RPM_TO_RPS(motor_speed->motor->max_speed_rpm);
