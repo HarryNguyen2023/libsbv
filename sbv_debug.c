@@ -11,7 +11,7 @@
 #include "sbv_control_balance.h"
 #include "sbv_debug.h"
 
-#define SBV_DEBUG_TX_TIMEOUT_MS     (100)
+#define SBV_DEBUG_TX_TIMEOUT_MS     (5)
 
 char rcv_command[7][5];
 sbv_debug_tx_t sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
@@ -32,6 +32,8 @@ sbv_debug_set_uart_interface (sbv_uart_instance_t *uart_instance)
         return -1;
 
     sbv_debug_interface.uart_instance = uart_instance;
+
+    sbv_uart_register_rx_cb (uart_instance, sbv_debug_command_handle);
     return 0;
 }
 

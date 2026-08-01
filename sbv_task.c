@@ -119,7 +119,7 @@ sbv_task_debug_console_task(void *param)
     /* Record the initial tick so the control loop can run at a fixed sample interval. */
     start_tick = sbv_rtos_get_tick();
     /* Register callback function to handle UART rx */
-    sbv_uart_register_rx_cb (&sbv_uart_1, sbv_debug_command_handle);
+    sbv_debug_set_uart_interface (&sbv_uart_1);
 
     for(;;)
     {
