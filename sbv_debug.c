@@ -48,6 +48,28 @@ sbv_debug_get_command_handle(void);
 static void
 sbv_debug_reset_command_handle(void);
 
+/*
+ * Strip trailing characters introduces by console applications
+ */
+static uint16_t
+sbv_debug_strip_line_ending (char *buffer, uint16_t len)
+{
+    while (len > 0)
+    {
+        char trailing = buffer[len - 1];
+        if (trailing == '\r' || trailing == '\n'
+            || trailing == ' ' || trailing == "\t")
+        {
+            buffer[--len] = '\0';
+            continue;
+        }
+
+        break;
+    }
+
+    return len;
+}
+
 static void
 sbv_debug_break_command(char* rcv_buffer, uint16_t size)
 {
@@ -88,6 +110,10 @@ sbv_debug_command_handle(char* rcv_buffer, const uint16_t size)
     command_size = (size < SBV_DEBUG_COMMAND_MAX_LEN) ? size : SBV_DEBUG_COMMAND_MAX_LEN;
     memcpy(rx_command_buffer, rcv_buffer, command_size);
     rx_command_buffer[SBV_DEBUG_COMMAND_MAX_LEN] = '\0';
+
+    command_size = sbv_debug_strip_line_ending(rx_command_buffer, command_size);
+    if (command_size == 0)
+        return -1;
 
     sbv_debug_break_command(rx_command_buffer, command_size);
 

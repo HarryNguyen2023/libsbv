@@ -44,11 +44,11 @@
  *          + We want to set the PID gain for balanced control PID (Kp:1,Ki:0.2,KD:0.1)
  *              s p B 1 0.2 0.1
  * 
- *      - Notice that the value will be output via UART to console every 100ms, to not
+ *      - Notice that the value will be output via UART to console every 500ms, to not
  *        waste the executing time of more critical tasks of the SBV robot system, and
  *        we must wire the UART correctly and set the baudrate of 115200kbps for the
  *        console, as well as enable the sbv_task_debug_console_task for transmitting
- *        and the sbv_task_uart_rx_task task for reception of commands in the sbv_task.c
+ *        and reception of commands in the sbv_task.c
  *        file when building the firmware to enable this feature. Thanks for reading.
  */
 
