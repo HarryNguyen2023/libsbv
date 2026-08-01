@@ -218,6 +218,8 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
         return 0;
     }
 
+    SBV_UART_MUTEX_UNLOCK (uart_instance);
+
     rx_buffer_ret_pos = uart_instance->uart_rx_buffer->buff + \
                             uart_instance->uart_rx_buffer->rear;
 

@@ -15,7 +15,7 @@ int
 sbv_i2c_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
 {
     if (sbv_i2c_hw_cb.sbv_i2c_master_init)
-        (sbv_i2c_hw_cb.sbv_i2c_master_init) (i2c_instance, i2c_handle);
+        return (sbv_i2c_hw_cb.sbv_i2c_master_init) (i2c_instance, i2c_handle);
 
     return SBV_ERROR;
 }

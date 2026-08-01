@@ -142,6 +142,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
                                    uint8_t received_buf[], uint16_t size, uint16_t timeout_ms)
 {
     sbv_rtos_tick_type_t tick_to_wait;
+    uint32_t notify;
     int recv_size = 0, ret = SBV_OK;
 
     if (! i2c_instance || ! received_buf)
@@ -166,7 +167,15 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
         return SBV_ERROR;
     }
 
-    sbv_rtos_notify_take(SBV_RTOS_TRUE, tick_to_wait);
+    notify = sbv_rtos_notify_take(SBV_RTOS_TRUE, tick_to_wait);
+    if (notify == 0)
+    {
+        /* No notification is received after the timeout event */
+        i2c_instance->i2c_rx_notify_task = NULL;
+        SBV_UART_MUTEX_UNLOCK (i2c_instance);
+        return 0;
+    }
+
     i2c_instance->i2c_rx_notify_task = NULL;
 
     memcpy (received_buf, i2c_instance->i2c_rx_buffer, recv_size);
