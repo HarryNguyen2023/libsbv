@@ -57,8 +57,9 @@ sbv_debug_strip_line_ending (char *buffer, uint16_t len)
     while (len > 0)
     {
         char trailing = buffer[len - 1];
+
         if (trailing == '\r' || trailing == '\n'
-            || trailing == ' ' || trailing == "\t")
+            || trailing == ' ' || trailing == '\t')
         {
             buffer[--len] = '\0';
             continue;
@@ -70,15 +71,15 @@ sbv_debug_strip_line_ending (char *buffer, uint16_t len)
     return len;
 }
 
-static void
+static int
 sbv_debug_break_command(char* rcv_buffer, uint16_t size)
 {
-    uint8_t i = 0, max_idx, token_size;
+    uint8_t i = 0, max_idx;
     char *token;
     char *saveptr;
 
     if(!rcv_buffer || size == 0)
-        return;
+        return -1;
 
     max_idx = sizeof(rcv_command) / sizeof(rcv_command[0]);
     memset(rcv_command, 0, sizeof(rcv_command));
@@ -87,9 +88,12 @@ sbv_debug_break_command(char* rcv_buffer, uint16_t size)
 
     while (token != NULL) 
     {
-        token_size = (strlen(token) <= SBV_DEBUG_MAX_LEN_PER_SLOT) \
-                        ? strlen(token) : SBV_DEBUG_MAX_LEN_PER_SLOT;
-        memcpy(rcv_command[i], token, token_size);
+        if (strlen(token) > SBV_DEBUG_MAX_LEN_PER_SLOT)
+        {
+            // LOG
+            return -1;
+        }
+        strcpy(rcv_command[i], token);
         rcv_command[i][SBV_DEBUG_MAX_LEN_PER_SLOT] = '\0';
         token = strtok_r(NULL, " ", &saveptr);
 
@@ -97,6 +101,8 @@ sbv_debug_break_command(char* rcv_buffer, uint16_t size)
         if(++i == max_idx)
             break;
     }
+
+    return SBV_OK;
 }
 
 int
@@ -115,7 +121,11 @@ sbv_debug_command_handle(char* rcv_buffer, const uint16_t size)
     if (command_size == 0)
         return -1;
 
-    sbv_debug_break_command(rx_command_buffer, command_size);
+    if (sbv_debug_break_command(rx_command_buffer, command_size) != SBV_OK)
+    {
+        sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
+        return -1;
+    }
 
     if((strlen(rcv_command[0]) != 1) || (strlen(rcv_command[1]) != 1))
     {
