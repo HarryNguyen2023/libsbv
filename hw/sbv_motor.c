@@ -130,12 +130,16 @@ sbv_motor_pwm_update(sbv_motor_t *motor, uint16_t duty_cycle)
 void
 sbv_motor_output_update(sbv_motor_t *motor, int16_t duty_cycle)
 {
+    int16_t duty_cycle_output;
+
     if(! motor)
         return;
 
     if(duty_cycle == 0)
     {
         sbv_motor_brake(motor);
+        motor->pwm_output = 0;
+        return;
     }
     else if(duty_cycle > 0)
     {
@@ -148,7 +152,10 @@ sbv_motor_output_update(sbv_motor_t *motor, int16_t duty_cycle)
         sbv_motor_move_ccw(motor);
     }
 
-    motor->pwm_output = duty_cycle;
+    duty_cycle_output = (duty_cycle > 0) ? duty_cycle : -(duty_cycle);
+    duty_cycle_output = (duty_cycle_output < motor->max_pwm) \
+                            ? duty_cycle_output : motor->max_pwm;
+    motor->pwm_output = duty_cycle_output;
     sbv_motor_pwm_update(motor, duty_cycle);
 }
 
