@@ -15,10 +15,11 @@
 #define SBV_DEBUG_COMMAND_MAX_LEN   (22)
 #define SBV_DEBUG_MAX_COMMAND_SLOT  (7)
 #define SBV_DEBUG_MAX_LEN_PER_SLOT  (4)
+#define SBV_DEBUG_TX_MAX_DATA_LEN   (100)
 
 char rcv_command[SBV_DEBUG_MAX_COMMAND_SLOT][SBV_DEBUG_MAX_LEN_PER_SLOT + 1];
 sbv_debug_tx_t sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
-char tx_logging_buffer[100];
+char tx_logging_buffer[SBV_DEBUG_TX_MAX_DATA_LEN];
 char rx_command_buffer[SBV_DEBUG_COMMAND_MAX_LEN + 1];
 
 extern sbv_control_balance_t sbv_control_balance;
@@ -170,8 +171,8 @@ sbv_debug_set_pid_gain(char pid)
         for(i = 0; i < 3; ++i)
             pid_gains[i] = strtof(rcv_command[3 + i], NULL);
 
-        sbv_pid_set_gain(&(sbv_control_balance.sbv_control_speed.steering_pid),
-                        pid_gains[0], pid_gains[1], pid_gains[2]);
+        sbv_control_balance_set_steering_pid_gain(&(sbv_control_balance),
+                                                  pid_gains[0], pid_gains[1], pid_gains[2]);
         break;
 
     case SBV_BALANCE_PID:
@@ -179,8 +180,8 @@ sbv_debug_set_pid_gain(char pid)
         for(i = 0; i < 3; ++i)
             pid_gains[i] = strtof(rcv_command[3 + i], NULL);
 
-        sbv_pid_set_gain(&(sbv_control_balance.balance_pid),
-                        pid_gains[0], pid_gains[1], pid_gains[2]);
+        sbv_control_balance_set_balance_pid_gain (&sbv_control_balance,
+                                                  pid_gains[0], pid_gains[1], pid_gains[2]);
         break;
 
     case SBV_SPEED_PID:
@@ -192,11 +193,11 @@ sbv_debug_set_pid_gain(char pid)
             pid_gains[i] = strtof(rcv_command[4 + i], NULL);
 
         if(motor_name == SBV_DEBUG_MOTOR_LEFT)
-            sbv_pid_set_gain(&(sbv_control_balance.sbv_control_speed.motor_left.motor_pid),
-                            pid_gains[0], pid_gains[1], pid_gains[2]);
+            sbv_control_balance_set_speed_pid_gain(&(sbv_control_balance), SBV_MOTOR_LEFT,
+                                                   pid_gains[0], pid_gains[1], pid_gains[2]);
         else if(motor_name == SBV_DEBUG_MOTOR_RIGHT)
-            sbv_pid_set_gain(&(sbv_control_balance.sbv_control_speed.motor_right.motor_pid),
-                            pid_gains[0], pid_gains[1], pid_gains[2]);
+            sbv_control_balance_set_speed_pid_gain(&(sbv_control_balance), SBV_MOTOR_RIGHT,
+                                                   pid_gains[0], pid_gains[1], pid_gains[2]);
         break;
 
     default:
@@ -215,13 +216,13 @@ sbv_debug_set_pid_target(char pid)
     case SBV_STEERING_PID:
         pid_target = strtof(rcv_command[3], NULL);
 
-        sbv_pid_set_target(&(sbv_control_balance.sbv_control_speed.steering_pid), pid_target);
+        sbv_control_balance_set_robot_twist_target(&(sbv_control_balance), pid_target);
         break;
 
     case SBV_BALANCE_PID:
         pid_target = strtof(rcv_command[3], NULL);
 
-        sbv_pid_set_target(&(sbv_control_balance.balance_pid), pid_target);
+        sbv_control_balance_set_balance_control_target(&(sbv_control_balance), pid_target);
         break;
 
     case SBV_SPEED_PID:
@@ -231,9 +232,9 @@ sbv_debug_set_pid_target(char pid)
         pid_target = strtof(rcv_command[4], NULL);
 
         if(motor_name == SBV_DEBUG_MOTOR_LEFT)
-            sbv_pid_set_target(&(sbv_control_balance.sbv_control_speed.motor_left.motor_pid), pid_target);
+            sbv_control_balance_set_motor_speed_target(&(sbv_control_balance), SBV_MOTOR_LEFT, pid_target);
         else if(motor_name == SBV_DEBUG_MOTOR_RIGHT)
-            sbv_pid_set_target(&(sbv_control_balance.sbv_control_speed.motor_right.motor_pid), pid_target);
+            sbv_control_balance_set_motor_speed_target(&(sbv_control_balance), SBV_MOTOR_RIGHT, pid_target);
         break;
 
     default:
@@ -332,19 +333,19 @@ sbv_debug_reset_pid_command_handle(char pid)
     switch (pid)
     {
     case SBV_STEERING_PID:
-        sbv_pid_reset(&(sbv_control_balance.sbv_control_speed.steering_pid));
+        sbv_control_balance_reset_steering_pid(&(sbv_control_balance));
         break;
 
     case SBV_BALANCE_PID:
-        sbv_pid_reset(&(sbv_control_balance.balance_pid));
+        sbv_control_balance_reset_balance_pid(&(sbv_control_balance));
         break;
 
     case SBV_SPEED_PID:
         motor_name = rcv_command[3][0];
         if(motor_name == SBV_DEBUG_MOTOR_LEFT)
-            sbv_pid_reset(&(sbv_control_balance.sbv_control_speed.motor_left.motor_pid));
+            sbv_control_balance_reset_speed_pid(&(sbv_control_balance), SBV_MOTOR_LEFT);
         else if(motor_name == SBV_DEBUG_MOTOR_RIGHT)
-            sbv_pid_reset(&(sbv_control_balance.sbv_control_speed.motor_right.motor_pid));
+            sbv_control_balance_reset_speed_pid(&(sbv_control_balance), SBV_MOTOR_RIGHT);
         break;
 
     default:
@@ -362,8 +363,7 @@ sbv_debug_reset_command_handle(void)
     switch (second_command)
     {
     case SBV_ENCODER:
-        sbv_motor_encoder_reset((sbv_control_balance.sbv_control_speed.motor_left.motor));
-        sbv_motor_encoder_reset((sbv_control_balance.sbv_control_speed.motor_right.motor));
+        sbv_control_balance_reset_encoder (&(sbv_control_balance));
         break;
 
     case SBV_PID_GAIN:
@@ -381,9 +381,7 @@ sbv_debug_tx_encoder(void)
 {
     memset(tx_logging_buffer, 0, sizeof(tx_logging_buffer));
 
-    sprintf(tx_logging_buffer, "\r\n%u,%u",
-            sbv_motor_read_encoder((sbv_control_balance.sbv_control_speed.motor_left.motor)),
-            sbv_motor_read_encoder((sbv_control_balance.sbv_control_speed.motor_right.motor)));
+    sbv_control_balance_get_encoder (&(sbv_control_balance), tx_logging_buffer, SBV_DEBUG_TX_MAX_DATA_LEN);
 
     sbv_uart_tx_send_data(sbv_debug_interface.uart_instance, (uint8_t*)tx_logging_buffer,
                           strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
@@ -394,11 +392,7 @@ sbv_debug_tx_imu(void)
 {
     memset(tx_logging_buffer, 0, sizeof(tx_logging_buffer));
 
-    sprintf(tx_logging_buffer, "\r\n%.4f,%.4f,%.4f,%.4f",
-            sbv_control_balance.imu->theta.est_sensor,
-            sbv_control_balance.imu->theta.est_post,
-            sbv_control_balance.imu->phi.est_sensor,
-            sbv_control_balance.imu->phi.est_post);
+    sbv_control_balance_get_imu (&(sbv_control_balance), tx_logging_buffer, SBV_DEBUG_TX_MAX_DATA_LEN);
 
     sbv_uart_tx_send_data(sbv_debug_interface.uart_instance, (uint8_t*)tx_logging_buffer,
                           strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);
@@ -432,9 +426,8 @@ sbv_debug_tx_pid(void)
     if(pid == NULL)
         return;
 
-    sprintf(tx_logging_buffer, "\r\n%.4f,%.4f,%.4f,%.4f,%.4f,%.4f",
-            pid->target, pid->feedback, pid->output,
-            pid->Kp, pid->Ki, pid->Kd);
+    sbv_control_balance_get_pid (&(sbv_control_balance), pid,
+                                tx_logging_buffer, SBV_DEBUG_TX_MAX_DATA_LEN);
 
     sbv_uart_tx_send_data(sbv_debug_interface.uart_instance, (uint8_t*)tx_logging_buffer,
                           strlen(tx_logging_buffer), SBV_DEBUG_TX_TIMEOUT_MS);

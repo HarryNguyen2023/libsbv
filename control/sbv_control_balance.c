@@ -73,3 +73,176 @@ sbv_control_balance_get_speed_sampling_time_ms (sbv_control_balance_t *sbv_ctrl_
 
     return sbv_control_robot_speed_get_sampling_time_ms (&(sbv_ctrl_balance->sbv_control_speed));
 }
+
+void
+sbv_control_balance_set_balance_pid_gain (sbv_control_balance_t *sbv_ctrl_balance,
+                                          float Kp, float Ki, float Kd)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_pid_set_gain(&(sbv_ctrl_balance->balance_pid), Kp, Ki, Kd);
+}
+
+void
+sbv_control_balance_set_steering_pid_gain (sbv_control_balance_t *sbv_ctrl_balance,
+                                          float Kp, float Ki, float Kd)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_pid_set_gain(&(sbv_ctrl_balance->sbv_control_speed.steering_pid),
+                    Kp, Ki, Kd);
+}
+
+void
+sbv_control_balance_set_speed_pid_gain (sbv_control_balance_t *sbv_ctrl_balance,
+                                        sbv_motor_type_t motor, float Kp, float Ki, float Kd)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    if (motor == SBV_MOTOR_LEFT)
+    {
+        sbv_pid_set_gain(&(sbv_ctrl_balance->sbv_control_speed.motor_left.motor_pid),
+                        Kp, Ki, Kd);
+    }
+    else if (motor == SBV_MOTOR_RIGHT)
+    {
+        sbv_pid_set_gain(&(sbv_ctrl_balance->sbv_control_speed.motor_right.motor_pid),
+                        Kp, Ki, Kd);
+    }
+}
+
+void
+sbv_control_balance_set_balance_control_target (sbv_control_balance_t *sbv_ctrl_balance, float target)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_pid_set_target(&(sbv_ctrl_balance->balance_pid), target);
+}
+
+void
+sbv_control_balance_set_robot_twist_target (sbv_control_balance_t *sbv_ctrl_balance, float target)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_control_robot_set_twist_target(&(sbv_ctrl_balance->sbv_control_speed), target);
+}
+
+void
+sbv_control_balance_set_robot_speed_target (sbv_control_balance_t *sbv_ctrl_balance, float target)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_control_robot_set_speed_target(&(sbv_ctrl_balance->sbv_control_speed), target);
+}
+
+void
+sbv_control_balance_set_robot_speed_twist_target (sbv_control_balance_t *sbv_ctrl_balance,
+                                                 float speed, float twist)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_control_robot_set_target(&(sbv_ctrl_balance->sbv_control_speed), speed, twist);
+}
+
+void
+sbv_control_balance_set_motor_speed_target (sbv_control_balance_t *sbv_ctrl_balance,
+                                            sbv_motor_type_t motor, float target)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    if (motor == SBV_MOTOR_LEFT)
+        sbv_pid_set_target(&(sbv_ctrl_balance->sbv_control_speed.motor_left.motor_pid), target);
+    else if (motor == SBV_MOTOR_RIGHT)
+        sbv_pid_set_target(&(sbv_ctrl_balance->sbv_control_speed.motor_right.motor_pid), target);
+}
+
+void
+sbv_control_balance_reset_balance_pid (sbv_control_balance_t *sbv_ctrl_balance)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_pid_reset(&(sbv_ctrl_balance->balance_pid));
+}
+
+void
+sbv_control_balance_reset_steering_pid (sbv_control_balance_t *sbv_ctrl_balance)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_pid_reset(&(sbv_ctrl_balance->sbv_control_speed.steering_pid));
+}
+
+void
+sbv_control_balance_reset_speed_pid (sbv_control_balance_t *sbv_ctrl_balance,
+                                    sbv_motor_type_t motor)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    if (motor == SBV_MOTOR_LEFT)
+    {
+        sbv_pid_reset(&(sbv_ctrl_balance->sbv_control_speed.motor_left.motor_pid));
+    }
+    else if (motor == SBV_MOTOR_RIGHT)
+    {
+        sbv_pid_reset(&(sbv_ctrl_balance->sbv_control_speed.motor_right.motor_pid));
+    }
+}
+
+void
+sbv_control_balance_reset_encoder (sbv_control_balance_t *sbv_ctrl_balance)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_motor_encoder_reset((sbv_ctrl_balance->sbv_control_speed.motor_left.motor));
+    sbv_motor_encoder_reset((sbv_ctrl_balance->sbv_control_speed.motor_right.motor));
+}
+
+void
+sbv_control_balance_get_encoder (sbv_control_balance_t *sbv_ctrl_balance,
+                                char *data_buffer, const uint16_t len)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    snprintf(data_buffer, len, "\r\n%u,%u",
+            sbv_motor_read_encoder((sbv_ctrl_balance->sbv_control_speed.motor_left.motor)),
+            sbv_motor_read_encoder((sbv_ctrl_balance->sbv_control_speed.motor_right.motor)));
+}
+
+void
+sbv_control_balance_get_imu (sbv_control_balance_t *sbv_ctrl_balance,
+                            char *data_buffer, const uint16_t len)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    snprintf(data_buffer, len, "\r\n%.4f,%.4f,%.4f,%.4f",
+            sbv_ctrl_balance->imu->theta.est_sensor,
+            sbv_ctrl_balance->imu->theta.est_post,
+            sbv_ctrl_balance->imu->phi.est_sensor,
+            sbv_ctrl_balance->imu->phi.est_post);
+}
+
+void
+sbv_control_balance_get_pid (sbv_control_balance_t *sbv_ctrl_balance, sbv_pid_t *pid,
+                            char *data_buffer, const uint16_t len)
+{
+    if (! sbv_ctrl_balance || ! pid)
+        return;
+
+    snprintf(data_buffer, len, "\r\n%.4f,%.4f,%.4f,%.4f,%.4f,%.4f",
+            pid->target, pid->feedback, pid->output,
+            pid->Kp, pid->Ki, pid->Kd);
+}
