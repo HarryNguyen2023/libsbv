@@ -122,3 +122,12 @@ sbv_pid_update_output (sbv_pid_t *pid, float feedback)
 
     pid->prev_error = pid->error;
 }
+
+uint16_t
+sbv_pid_get_sampling_time_ms (sbv_pid_t *pid)
+{
+    if (! pid)
+        return 0;
+
+    return pid->sampling_time_ms;
+}

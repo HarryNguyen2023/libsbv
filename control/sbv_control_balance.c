@@ -34,20 +34,43 @@ sbv_control_balance_update(sbv_control_balance_t *sbv_ctrl_balance)
 {
     float left_motor_output, right_motor_output;
 
-    if(! sbv_ctrl_balance || ! (sbv_ctrl_balance->sbv_control_speed.motor_left.motor)
-        || ! (sbv_ctrl_balance->sbv_control_speed.motor_right.motor))
+    if (! sbv_ctrl_balance || ! (sbv_ctrl_balance->imu))
         return;
 
     /* Read IMU sensor and perform Kalman filter */
     sbv_imu_kalman_update(sbv_ctrl_balance->imu);
 
-    /* Update PID control */
+    /* Update outer balance PID control loop */
     sbv_pid_update_output(&(sbv_ctrl_balance->balance_pid), sbv_ctrl_balance->imu->theta.est_post);
 
-    left_motor_output = sbv_ctrl_balance->balance_pid.output + sbv_ctrl_balance->sbv_control_speed.motor_left.motor->pwm_output;
-    right_motor_output = sbv_ctrl_balance->balance_pid.output + sbv_ctrl_balance->sbv_control_speed.motor_right.motor->pwm_output;
+    /* Feed forward this control value to inner and faster speed & twist control loop */
+    sbv_control_robot_set_feed_forward(&(sbv_ctrl_balance->sbv_control_speed),
+                                        sbv_ctrl_balance->balance_pid.output);
+}
 
-    /* Generate PWM output to change motor speed */
-    sbv_motor_output_update((sbv_ctrl_balance->sbv_control_speed.motor_left.motor), left_motor_output);
-    sbv_motor_output_update((sbv_ctrl_balance->sbv_control_speed.motor_right.motor), right_motor_output);
+void
+sbv_control_balance_update_speed_twist_control (sbv_control_balance_t *sbv_ctrl_balance)
+{
+    if (! sbv_ctrl_balance)
+        return;
+
+    sbv_control_robot_speed_twist_update(&(sbv_ctrl_balance->sbv_control_speed));
+}
+
+uint16_t
+sbv_control_balance_get_balance_sampling_time_ms (sbv_control_balance_t *sbv_ctrl_balance)
+{
+    if (! sbv_ctrl_balance)
+        return 0;
+
+    return sbv_pid_get_sampling_time_ms (&(sbv_ctrl_balance->balance_pid));
+}
+
+uint16_t
+sbv_control_balance_get_speed_sampling_time_ms (sbv_control_balance_t *sbv_ctrl_balance)
+{
+    if (! sbv_ctrl_balance)
+        return 0;
+
+    return sbv_control_robot_speed_get_sampling_time_ms (&(sbv_ctrl_balance->sbv_control_speed));
 }

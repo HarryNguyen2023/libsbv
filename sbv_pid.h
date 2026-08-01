@@ -30,4 +30,6 @@ void
 sbv_pid_reset (sbv_pid_t *pid);
 void
 sbv_pid_update_output (sbv_pid_t *pid, float feedback);
+uint16_t
+sbv_pid_get_sampling_time_ms (sbv_pid_t *pid);
 #endif /*SBV_PID_H*/

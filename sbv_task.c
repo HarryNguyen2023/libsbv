@@ -76,30 +76,32 @@ sbv_task_init(void)
 void
 sbv_task_balance_control(void *param)
 {
-    uint16_t balance_update_period_ms;
-    sbv_rtos_tick_type_t balance_update_period_ticks;
-    sbv_rtos_tick_type_t speed_update_delay_ticks;
+    sbv_rtos_tick_type_t balance_update_period_ticks, balance_deadline_tick;
+    sbv_rtos_tick_type_t speed_update_delay_ticks, speed_wake_tick;
 
     /* Use the balance controller sampling period as the main update interval. */
-    balance_update_period_ms = sbv_control_balance.balance_pid.sampling_time_ms;
-    balance_update_period_ticks = sbv_rtos_ms_to_tick(balance_update_period_ms);
+    balance_update_period_ticks = sbv_rtos_ms_to_tick(sbv_control_balance_get_balance_sampling_time_ms(&sbv_control_balance));
     /* Delay between speed/twist updates follows the steering PID sampling period. */
-    speed_update_delay_ticks = sbv_rtos_ms_to_tick(sbv_control_balance.sbv_control_speed.steering_pid.sampling_time_ms);
+    speed_update_delay_ticks = sbv_rtos_ms_to_tick(sbv_control_balance_get_speed_sampling_time_ms(&sbv_control_balance));
 
     for(;;)
     {
-        sbv_rtos_tick_type_t balance_deadline_tick = sbv_rtos_get_tick() + balance_update_period_ticks;
-        sbv_rtos_tick_type_t speed_wake_tick = sbv_rtos_get_tick();
+        /* 
+         * Outer slower PID balance control loop: sample IMU and held balance term,
+         * then feedforward the control value into inner faster speed and twist
+         * control loop to apply the balance held term in every actuator update
+         */
+        sbv_control_balance_update(&sbv_control_balance);
+
+        balance_deadline_tick = sbv_rtos_get_tick() + balance_update_period_ticks;
+        speed_wake_tick = sbv_rtos_get_tick();
 
         /* Run the speed/twist controller on a fixed cadence until the balance window expires. */
         while (sbv_rtos_get_tick() < balance_deadline_tick)
         {
-            sbv_control_robot_speed_twist_update(&(sbv_control_balance.sbv_control_speed));
+            sbv_control_balance_update_speed_twist_control (&sbv_control_balance);
             sbv_rtos_task_delay_until(&speed_wake_tick, speed_update_delay_ticks);
         }
-
-        /* Once the interval has elapsed, update balance control and start the next window. */
-        sbv_control_balance_update(&sbv_control_balance);
     }
 }
 

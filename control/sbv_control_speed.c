@@ -57,6 +57,7 @@ sbv_control_robot_speed_init(sbv_control_robot_speed_t *sbv_speed_ctrl, float wh
 
     sbv_speed_ctrl->speed = 0;
     sbv_speed_ctrl->twist = 0;
+    sbv_speed_ctrl->feed_forward_ctrl = 0;
 
     sbv_speed_ctrl->wheel_diameter = wheel_diameter;
     sbv_speed_ctrl->wheel_distance = wheel_distance;
@@ -161,6 +162,15 @@ sbv_control_robot_set_target(sbv_control_robot_speed_t *sbv_speed_ctrl, float sp
     sbv_control_robot_set_twist_target(sbv_speed_ctrl, twist);
 }
 
+void
+sbv_control_robot_set_feed_forward(sbv_control_robot_speed_t *sbv_speed_ctrl, float feed_forward_ctrl)
+{
+    if(!sbv_speed_ctrl)
+        return;
+
+    sbv_speed_ctrl->feed_forward_ctrl = feed_forward_ctrl;
+}
+
 static void
 sbv_control_motor_speed_update_test(sbv_control_motor_speed_t* motor_speed)
 {
@@ -261,9 +271,20 @@ sbv_control_robot_speed_twist_update(sbv_control_robot_speed_t *sbv_speed_ctrl)
     sbv_control_robot_speed_update(sbv_speed_ctrl);
     sbv_control_robot_twist_update(sbv_speed_ctrl);
 
-    left_motor_output = sbv_speed_ctrl->motor_left.motor_pid.output - sbv_speed_ctrl->steering_pid.output;
-    right_motor_output = sbv_speed_ctrl->motor_right.motor_pid.output + sbv_speed_ctrl->steering_pid.output;
+    left_motor_output = sbv_speed_ctrl->motor_left.motor_pid.output - sbv_speed_ctrl->steering_pid.output
+                        + sbv_speed_ctrl->feed_forward_ctrl;
+    right_motor_output = sbv_speed_ctrl->motor_right.motor_pid.output + sbv_speed_ctrl->steering_pid.output
+                        + sbv_speed_ctrl->feed_forward_ctrl;
 
     sbv_motor_output_update((sbv_speed_ctrl->motor_left.motor), left_motor_output);
     sbv_motor_output_update((sbv_speed_ctrl->motor_right.motor), right_motor_output);
+}
+
+uint16_t
+sbv_control_robot_speed_get_sampling_time_ms (sbv_control_robot_speed_t *sbv_speed_ctrl)
+{
+    if (! sbv_speed_ctrl)
+        return 0;
+
+    return sbv_pid_get_sampling_time_ms(&(sbv_speed_ctrl->steering_pid));
 }

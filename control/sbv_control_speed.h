@@ -26,6 +26,7 @@ typedef struct sbv_control_robot_speed_t
     sbv_control_motor_speed_t motor_right;
 
     sbv_pid_t steering_pid;
+    float     feed_forward_ctrl;
 } sbv_control_robot_speed_t;
 
 void
@@ -34,6 +35,8 @@ void
 sbv_control_robot_set_speed_target(sbv_control_robot_speed_t *sbv_speed_ctrl, float speed);
 void
 sbv_control_robot_set_twist_target(sbv_control_robot_speed_t *sbv_speed_ctrl, float twsit);
+void
+sbv_control_robot_set_feed_forward(sbv_control_robot_speed_t *sbv_speed_ctrl, float feed_forward_ctrl);
 void
 sbv_control_robot_speed_update_test(sbv_control_robot_speed_t *sbv_speed_ctrl);
 void
@@ -47,4 +50,6 @@ void
 sbv_control_robot_set_target(sbv_control_robot_speed_t *sbv_speed_ctrl, float speed, float twist);
 void
 sbv_control_robot_speed_twist_update(sbv_control_robot_speed_t *sbv_speed_ctrl);
+uint16_t
+sbv_control_robot_speed_get_sampling_time_ms (sbv_control_robot_speed_t *sbv_speed_ctrl);
 #endif /*SBV_CONTROL_SPEED_H*/
