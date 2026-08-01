@@ -204,9 +204,6 @@ sbv_control_motor_speed_update(sbv_control_motor_speed_t* motor_speed)
     if(! motor_speed || ! motor_speed->motor)
         return;
 
-    /* Read encoders value */
-    sbv_motor_get_speed((motor_speed->motor));
-
     /* Update PID control */
     sbv_pid_update_output(&(motor_speed->motor_pid), motor_speed->motor->encoder_shift);
 }
@@ -251,10 +248,6 @@ sbv_control_robot_twist_update(sbv_control_robot_speed_t *sbv_speed_ctrl)
     if(! sbv_speed_ctrl || ! sbv_speed_ctrl->motor_right.motor || ! sbv_speed_ctrl->motor_left.motor)
         return;
 
-    /* Read 2 wheel encoders value */
-    sbv_motor_get_speed((sbv_speed_ctrl->motor_right.motor));
-    sbv_motor_get_speed((sbv_speed_ctrl->motor_left.motor));
-
     wheel_diff_pulse_per_frame = (sbv_speed_ctrl->motor_right.motor->encoder_shift) -
                                  (sbv_speed_ctrl->motor_left.motor->encoder_shift);
     /* Update PID control */
@@ -268,6 +261,10 @@ sbv_control_robot_speed_twist_update(sbv_control_robot_speed_t *sbv_speed_ctrl)
 
     if(!sbv_speed_ctrl)
         return;
+
+    /* Read 2 wheel encoders value */
+    sbv_motor_get_speed((sbv_speed_ctrl->motor_right.motor));
+    sbv_motor_get_speed((sbv_speed_ctrl->motor_left.motor));
 
     sbv_control_robot_speed_update(sbv_speed_ctrl);
     sbv_control_robot_twist_update(sbv_speed_ctrl);

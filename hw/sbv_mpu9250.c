@@ -19,9 +19,9 @@
 #define SBV_MPU9250_RCV_I2C_TIMEOUT     10
 
 /* Sensitivity for SBV_MPU9250_ACCEL_CONFIG: AFS_SEL = +-8g */
-#define SBV_MPU9250_ACCEL_LSP_PER_G     (4096.0f)
+#define SBV_MPU9250_ACCEL_LSB_PER_G     (4096.0f)
 /* Sensitivity for SBV_MPU9250_GYRO_CONFIG: FS_SEL = +-500/s */
-#define SBV_MPU9250_GYRO_LSP_PER_DPS    (65.5f)
+#define SBV_MPU9250_GYRO_LSB_PER_DPS    (65.5f)
 
 uint8_t sbv_mpu_cfg_buffer[SBV_MPU9250_CFG_MSG_SIZE];
 uint8_t sbv_mpu_rcv_buffer[SBV_MPU9250_RCV_MSG_SIZE];
@@ -85,18 +85,18 @@ sbv_mpu9250_read_sensor(sbv_imu_gyroscope_t *gyro, sbv_imu_accelerometer_t *acce
     }
 
     accel->x = (float) sbv_mpu9250_read_raw16(sbv_i2c_rx_buffer[0], sbv_i2c_rx_buffer[1])
-                / SBV_MPU9250_ACCEL_LSP_PER_G;
+                / SBV_MPU9250_ACCEL_LSB_PER_G;
     accel->y = (float) sbv_mpu9250_read_raw16(sbv_i2c_rx_buffer[2], sbv_i2c_rx_buffer[3])
-                / SBV_MPU9250_ACCEL_LSP_PER_G;
+                / SBV_MPU9250_ACCEL_LSB_PER_G;
     accel->z = (float) sbv_mpu9250_read_raw16(sbv_i2c_rx_buffer[4], sbv_i2c_rx_buffer[5])
-                / SBV_MPU9250_ACCEL_LSP_PER_G;
+                / SBV_MPU9250_ACCEL_LSB_PER_G;
 
     gyro->x = (float) sbv_mpu9250_read_raw16(sbv_i2c_rx_buffer[8], sbv_i2c_rx_buffer[9])
-                / SBV_MPU9250_GYRO_LSP_PER_DPS;
+                / SBV_MPU9250_GYRO_LSB_PER_DPS;
     gyro->y = (float) sbv_mpu9250_read_raw16(sbv_i2c_rx_buffer[10], sbv_i2c_rx_buffer[11])
-                / SBV_MPU9250_GYRO_LSP_PER_DPS;
+                / SBV_MPU9250_GYRO_LSB_PER_DPS;
     gyro->z = (float) sbv_mpu9250_read_raw16(sbv_i2c_rx_buffer[12], sbv_i2c_rx_buffer[13])
-                / SBV_MPU9250_GYRO_LSP_PER_DPS;
+                / SBV_MPU9250_GYRO_LSB_PER_DPS;
 }
 
 int
