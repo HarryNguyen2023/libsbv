@@ -104,17 +104,18 @@ sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
                  sbv_imu_gyroscope_t *gyro, sbv_imu_accelerometer_t *accel)
 {
     int ret = SBV_OK, recv_byte = 0;
-    uint8_t try_num = 0;
+    uint8_t try_num = 0, read_reg;
 
     if(! i2c_instance || !gyro || !accel)
         return SBV_ERROR;
 
+    read_reg = SBV_MPU9250_REG_ACCEL_XOUT_H;
     /* Start to read from the  SBV_MPU9250_REG_ACCEL_XOUT_H register */
     while (try_num++ < SBV_MPU_9250_MAX_WRITE_TRY)
     {
+        
         ret = sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                                       (uint8_t) SBV_MPU9250_REG_ACCEL_XOUT_H, 1,
-                                       SBV_MPU9250_REQ_I2C_TIMEOUT);
+                                       &read_reg, 1, SBV_MPU9250_REQ_I2C_TIMEOUT);
         if (ret == SBV_OK)
             break;
     }
