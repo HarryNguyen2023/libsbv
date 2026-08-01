@@ -121,7 +121,7 @@ sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
     }
 
     /* Fail to request data from MPU9250 */
-    if (try_num > SBV_MPU_9250_MAX_WRITE_TRY)
+    if (try_num >= SBV_MPU_9250_MAX_WRITE_TRY)
     {
         // LOG
         return SBV_ERROR;
