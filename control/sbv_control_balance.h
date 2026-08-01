@@ -10,6 +10,7 @@ typedef struct sbv_control_balance_t
     sbv_imu_instance_t          *imu;
     sbv_pid_t                   balance_pid;
     sbv_control_robot_speed_t   sbv_control_speed;
+    sbv_rtos_mutex_t            mu;
 } sbv_control_balance_t;
 
 void

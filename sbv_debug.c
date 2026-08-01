@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "sbv.h"
+#include "sbv_rtos.h"
 #include "sbv_uart.h"
 #include "sbv_imu.h"
 #include "sbv_gpio.h"

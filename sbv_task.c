@@ -112,9 +112,9 @@ void
 sbv_task_debug_console_task(void *param)
 {
     uint32_t start_tick;
-    uint8_t debug_streaming_delay_ms = 500;
-    uint8_t uart_rcv_sampling_ms     = 10;
-    uint8_t uart_rx_timeout_ms       = 90;
+    uint16_t debug_streaming_delay_ms = 500;
+    uint8_t uart_rcv_sampling_ms      = 10;
+    uint8_t uart_rx_timeout_ms        = 90;
 
     /* Record the initial tick so the control loop can run at a fixed sample interval. */
     start_tick = sbv_rtos_get_tick();
