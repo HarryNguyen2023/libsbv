@@ -1,3 +1,4 @@
+#include "math.h"
 #include "sbv.h"
 #include "sbv_gpio.h"
 #include "sbv_motor.h"
@@ -138,7 +139,7 @@ sbv_motor_output_update(sbv_motor_t *motor, int16_t duty_cycle)
         return;
 
     if(duty_cycle == 0
-        || duty_cycle > 0 && duty_cycle < motor->dead_band_dc)
+        || abs(duty_cycle) < motor->dead_band_dc)
     {
         sbv_motor_brake(motor);
         return;
