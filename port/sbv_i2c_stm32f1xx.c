@@ -172,7 +172,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
     {
         /* No notification is received after the timeout event */
         i2c_instance->i2c_rx_notify_task = NULL;
-        SBV_UART_MUTEX_UNLOCK (i2c_instance);
+        SBV_I2C_RX_BUFFER_MUTEX_UNLOCK(i2c_instance);
         return 0;
     }
 
