@@ -5,8 +5,8 @@
 #include "sbv_imu.h"
 #include "sbv_i2c.h"
 
-#define SBV_IMU_PI                  (3.141592654)
-#define SBV_IMU_GRAV_ACC            (9.8)
+#define SBV_IMU_PI                  (3.141592654f)
+#define SBV_IMU_RAD_TO_DEG          (180.0f / SBV_IMU_PI)
 
 #ifdef SBV_MPU9250
 #include "sbv_mpu9250.h"
@@ -54,13 +54,13 @@ sbv_imu_sensor_read (sbv_imu_gyroscope_t* gyro, sbv_imu_accelerometer_t* acc, sb
 
     if (angle->name == SBV_IMU_THETA)
     {
-        angle->w = (gyro->y) * (-1.0);
-        angle->est_sensor = ((atan2(acc->x / SBV_IMU_GRAV_ACC, acc->z / SBV_IMU_GRAV_ACC) / (2 * SBV_IMU_PI)) * 360);
+        angle->w = (gyro->y) * (-1.0f);
+        angle->est_sensor = atan2f(acc->x, acc->z) * SBV_IMU_RAD_TO_DEG;
     }
     else if(angle->name == SBV_IMU_PHI)
     {
         angle->w = gyro->x;
-        angle->est_sensor = ((atan2(acc->y / SBV_IMU_GRAV_ACC, acc->z / SBV_IMU_GRAV_ACC) / (2 * SBV_IMU_PI)) * 360);
+        angle->est_sensor = atan2f(acc->y, acc->z) * SBV_IMU_RAD_TO_DEG;
     }
 }
 
