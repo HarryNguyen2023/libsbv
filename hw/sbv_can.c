@@ -25,46 +25,30 @@ sbv_can_hw_cb_t sbv_can_hw_cb = {
 };
 
 void
-sbv_can_init(void *can_handle)
+sbv_can_init(sbv_can_instance_t *can_instance, void *can_handle)
 {
     if (sbv_can_hw_cb.sbv_can_init)
-        (sbv_can_hw_cb.sbv_can_init) (can_handle);
+        (sbv_can_hw_cb.sbv_can_init) (can_instance, can_handle);
 }
 
 int
-sbv_can_send_data(sbv_can_msg_type_t msg_type, uint8_t *data, uint8_t length)
+sbv_can_send_data(sbv_can_instance_t *can_instance,
+                  sbv_can_msg_type_t msg_type,
+                  uint8_t *data, uint16_t length)
 {
     if (sbv_can_hw_cb.sbv_can_send_data)
-        return (sbv_can_hw_cb.sbv_can_send_data) (msg_type, data, length);
+        return (sbv_can_hw_cb.sbv_can_send_data) (can_instance, msg_type, data, length);
 
     return 0;
 }
 
-uint8_t *
-sbv_can_rcv_data (uint8_t *length, uint16_t *std_id)
+uint16_t
+sbv_can_rcv_data(sbv_can_instance_t *can_instance,
+                 uint8_t *rcv_buffer, uint16_t buffer_length,
+                 uint16_t rcv_timeout_ms)
 {
     if (sbv_can_hw_cb.sbv_can_rcv_data)
-        return (sbv_can_hw_cb.sbv_can_rcv_data) (length, std_id);
-
-    *length = 0;
-    *std_id = 0;
-    return NULL;
-}
-
-void
-sbv_can_pkt_process(uint8_t *data, uint8_t length, uint16_t std_id)
-{
-    if(! data || ! (sbv_can_hw_cb.sbv_can_std_id_get))
-        return;
-
-    if(std_id == (sbv_can_hw_cb.sbv_can_std_id_get) (SBV_CAN_STD_ID_OTA))
-    {
-        sbv_ota_msg_rx_handle(data, length);
-    }
-    else if((std_id == SBV_CAN_STD_ID_TUNNING)
-            || (std_id == SBV_CAN_STD_ID_COMMAND)
-            || (std_id == SBV_CAN_STD_ID_LOGGING))
-    {
-        return;
-    }
+        return (sbv_can_hw_cb.sbv_can_rcv_data) (can_instance, rcv_buffer,
+                                                 buffer_length, rcv_timeout_ms);
+    return 0;
 }

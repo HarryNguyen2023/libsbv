@@ -1,5 +1,6 @@
 #include <string.h>
 #include "sbv_rtos.h"
+#include "sbv_cqbuff.h"
 #include "sbv_can.h"
 #include "sbv_can_esp32s3.h"
 

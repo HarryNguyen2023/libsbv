@@ -4,6 +4,7 @@
 
 #include "sbv.h"
 #include "sbv_rtos.h"
+#include "sbv_cqbuff.h"
 #include "sbv_task.h"
 #include "sbv_can.h"
 #include "sbv_uart.h"

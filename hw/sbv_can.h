@@ -18,21 +18,6 @@ typedef enum sbv_can_msg_type_t
 #include "sbv_can_esp32s3.h"
 #endif /*STM32F1xx*/
 
-#define SBV_CAN_RX_BUFFER_MUTEX_LOCK \
-        sbv_rtos_mutex_lock(SBV_CAN_RX_BUFFER_MUTEX)
-
-#define SBV_CAN_RX_BUFFER_MUTEX_UNLOCK \
-        sbv_rtos_mutex_unlock(SBV_CAN_RX_BUFFER_MUTEX)
-
-#define SBV_CAN_TX_BUFFER_MUTEX_LOCK \
-        sbv_rtos_mutex_lock(SBV_CAN_TX_BUFFER_MUTEX)
-
-#define SBV_CAN_TX_BUFFER_MUTEX_UNLOCK \
-        sbv_rtos_mutex_unlock(SBV_CAN_TX_BUFFER_MUTEX)
-
-#define SBV_CAN_RX_TIMEOUT  sbv_rtos_ms_to_tick(1000)
-#define SBV_CAN_TX_TIMEOUT  sbv_rtos_ms_to_tick(10)
-
 #define SBV_CAN_STD_ID_BASE             (0x5)
 #define SBV_CAN_STD_ID_BASE_OFFSET      (8)
 
@@ -47,21 +32,26 @@ typedef enum sbv_can_msg_type_t
 #define SBV_CAN_STD_ID_FILTER_ID        (SBV_CAN_STD_ID_BASE << SBV_CAN_STD_ID_BASE_OFFSET)
 #define SBV_CAN_STD_ID_MASK             (0x7 << SBV_CAN_STD_ID_BASE_OFFSET)
 
+#define SBV_CAN_MAX_WRITE_RETRY         (5)
+
 typedef struct sbv_can_hw_cb_t
 {
-    void (*sbv_can_init) (void *);
-    int (*sbv_can_send_data) (sbv_can_msg_type_t, uint8_t *, uint8_t);
-    uint8_t* (*sbv_can_rcv_data) (uint8_t *, uint16_t *);
+    void (*sbv_can_init) (sbv_can_instance_t *, void *);
+    int (*sbv_can_send_data) (sbv_can_instance_t *, sbv_can_msg_type_t, uint8_t *, uint16_t);
+    uint16_t (*sbv_can_rcv_data) (sbv_can_instance_t *, uint8_t *, uint16_t, uint16_t);
     uint32_t (*sbv_can_std_id_get) (uint32_t);
 } sbv_can_hw_cb_t;
 
 void
-sbv_can_init(void *can_handle);
+sbv_can_init(sbv_can_instance_t *can_instance,
+             void *can_handle);
 int
-sbv_can_send_data(sbv_can_msg_type_t msg_type, uint8_t *data, uint8_t length);
-uint8_t*
-sbv_can_rcv_data(uint8_t *length,  uint16_t *std_id);
-void
-sbv_can_pkt_process(uint8_t *data, uint8_t length, uint16_t std_id);
+sbv_can_send_data(sbv_can_instance_t *can_instance,
+                  sbv_can_msg_type_t msg_type,
+                  uint8_t *data, uint16_t length);
+uint16_t
+sbv_can_rcv_data(sbv_can_instance_t *can_instance,
+                 uint8_t *rcv_buffer, uint16_t buffer_length,
+                 uint16_t rcv_timeout_ms);
 
 #endif /*SBV_CAN_H*/

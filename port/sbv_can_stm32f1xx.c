@@ -1,17 +1,53 @@
 #include <string.h>
 #include "sbv_rtos.h"
+#include "sbv_cqbuff.h"
 #include "sbv_can.h"
 #include "sbv_can_stm32f1xx.h"
 
 #ifdef STM32F1xx
 
+struct sbv_can_instances_list_t sbv_can_instances_list = {0};
+
 #define sbv_can_stm32f1xx_rx_hw_callback \
         HAL_CAN_RxFifo1MsgPendingCallback
 
-sbv_can_instance_t sbv_can_instance;
+/* Return the can instance that owns the given HAL can handle. */
+static sbv_can_instance_t*
+sbv_can_stm32f1xx_get_instance_by_handle (sbv_can_handle_t* can_handle)
+{
+    if (! can_handle)
+        return NULL;
 
-extern sbv_rtos_mutex_t SBV_CAN_RX_BUFFER_MUTEX;
-extern sbv_rtos_mutex_t SBV_CAN_TX_BUFFER_MUTEX;
+    for (uint8_t i = 0; i < SBV_CAN_MAX_CHANNEL; ++i)
+    {
+        if (sbv_can_instances_list.list[i]
+            && sbv_can_instances_list.list[i]->can_handle == can_handle)
+        {
+           return sbv_can_instances_list.list[i];
+        }
+    }
+
+    return NULL;
+}
+
+/* Register a new can instance in the internal instance list. */
+static int
+sbv_can_stm32f1xx_add_instance_to_list (sbv_can_instance_t *can_instance)
+{
+    if (! can_instance)
+        return SBV_ERROR;
+
+    for (uint8_t i = 0; i < SBV_CAN_MAX_CHANNEL; ++i)
+    {
+        if (sbv_can_instances_list.list[i] == NULL)
+        {
+           sbv_can_instances_list.list[i] =  can_instance;
+           return SBV_OK;
+        }
+    }
+
+    return SBV_ERROR;
+}
 
 void
 sbv_can_stm32f1xx_filter_init(sbv_can_handle_t *can_handle)
@@ -63,23 +99,27 @@ sbv_can_stm32f1xx_callback_deregister(sbv_can_handle_t *can_handle)
 }
 
 void
-sbv_can_stm32f1xx_init(sbv_can_handle_t *can_handle)
+sbv_can_stm32f1xx_init(sbv_can_instance_t *can_instance,
+                       sbv_can_handle_t *can_handle)
 {
-    if (! can_handle)
+    if (! can_instance || ! can_handle)
         return;
+
+    if (sbv_can_stm32f1xx_add_instance_to_list (can_instance) != SBV_OK)
+    {
+        /* LOG */
+        return;
+    }
 
     /*Intiiate CAN_RX filtering*/
     sbv_can_stm32f1xx_filter_init (can_handle);
 
-    memset (&sbv_can_instance, 0, sizeof (sbv_can_instance_t));
-    sbv_can_instance.can_active          = SBV_TRUE;
-    sbv_can_instance.can_rx_notify_task  = NULL;
-    sbv_can_instance.can_handle          = can_handle;
-    sbv_can_instance.can_reg_callback    = SBV_FALSE;
-
-    /* Create the mutex for the CAN TX and RX FIFO */
-    sbv_rtos_mutex_create(SBV_CAN_RX_BUFFER_MUTEX);
-    sbv_rtos_mutex_create(SBV_CAN_TX_BUFFER_MUTEX);
+    memset (can_instance, 0, sizeof (sbv_can_instance_t));
+    can_instance->can_active          = SBV_TRUE;
+    can_instance->can_rx_notify_task  = NULL;
+    can_instance->can_handle          = can_handle;
+    can_instance->can_reg_callback    = SBV_FALSE;
+    can_instance->can_rcv_buf         = sbv_cqbuff_create(SBV_CAN_RCV_BUFFER_SIZE, 1);
 
     HAL_CAN_Start(can_handle);
 
@@ -121,7 +161,7 @@ sbv_can_stm32f1xx_std_id_get (uint32_t msg_id)
 static int
 sbv_can_stm32f1xx_header_format (sbv_can_tx_pkt_t *can_pkt,
                                 sbv_can_msg_type_t msg_type,
-                                uint8_t *data, uint8_t length)
+                                uint8_t *data, uint16_t length)
 {
     uint32_t std_id;
     int sent_bytes;
@@ -172,78 +212,102 @@ sbv_can_stm32f1xx_header_format (sbv_can_tx_pkt_t *can_pkt,
 }
 
 int
-sbv_can_stm32f1xx_send_data(sbv_can_msg_type_t msg_type, uint8_t *data, uint8_t length)
+sbv_can_stm32f1xx_send_data(sbv_can_instance_t *can_instance,
+                            sbv_can_msg_type_t msg_type,
+                            uint8_t *data, uint16_t length)
 {
-    int ret = SBV_OK, total_tx_bytes = 0, cur_tx_bytes = 0;
+    int ret = SBV_OK;
+    uint8_t try_num = 0;
+    uint16_t total_tx_bytes = 0, cur_tx_bytes = 0;
     sbv_can_tx_pkt_t can_tx_pkt;
 
-    if(!data || !length
-        || !(sbv_can_instance.can_active))
+    if(! can_instance || !data || (length == 0)
+        || !(can_instance->can_active))
         return SBV_ERROR;
-
-    SBV_CAN_TX_BUFFER_MUTEX_LOCK;
 
     while (total_tx_bytes < length)
     {
-        cur_tx_bytes = sbv_can_stm32f1xx_header_format(&can_tx_pkt, msg_type, data + total_tx_bytes, length - total_tx_bytes);
-        ret = sbv_can_stm32f1xx_send_pkt(sbv_can_instance.can_handle, &can_tx_pkt);
+        cur_tx_bytes = sbv_can_stm32f1xx_header_format(&can_tx_pkt, msg_type,
+                                                        data + total_tx_bytes,
+                                                        length - total_tx_bytes);
+        ret = sbv_can_stm32f1xx_send_pkt(can_instance->can_handle, &can_tx_pkt);
         if (ret != SBV_OK)
-            continue;
+        {
+            // LOG
+            if (try_num++ >= SBV_CAN_MAX_WRITE_RETRY)
+            {
+                // LOG
+                break;
+            }
+        }
         total_tx_bytes += cur_tx_bytes;
     }
-
-    SBV_CAN_TX_BUFFER_MUTEX_UNLOCK;
 
     return total_tx_bytes;
 }
 
 void
-sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *hcan)
+sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
 {
+    sbv_can_instance_t *can_instance = NULL;
+    sbv_can_rx_pkt_t can_rx_packet;
     sbv_rtos_base_type_t xHigherPriorityTaskWoken = SBV_RTOS_FALSE;
 
-    HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &(sbv_can_instance.can_rx_packet.sbv_can_header),
-                         sbv_can_instance.can_rx_packet.sbv_can_data);
-
-    if(sbv_can_instance.can_rx_notify_task != NULL)
+    can_instance = sbv_can_stm32f1xx_get_instance_by_handle (can_hanlde);
+    if (can_instance == NULL)
     {
-        sbv_rtos_notify_give_fromISR(sbv_can_instance.can_rx_notify_task, &xHigherPriorityTaskWoken);
+        // LOG
+        return;
+    }
+
+    HAL_CAN_GetRxMessage(can_hanlde, CAN_RX_FIFO1,
+                         &(can_rx_packet.sbv_can_header),
+                         can_rx_packet.sbv_can_data);
+
+    if (can_instance->can_active
+        && can_instance->can_rcv_buf)
+    {
+        sbv_cqbuff_write (can_instance->can_rcv_buf, &can_rx_packet, sizeof(sbv_can_rx_pkt_t));
+    }
+
+    if(can_instance->can_rx_notify_task != NULL)
+    {
+        sbv_rtos_notify_give_fromISR(can_instance->can_rx_notify_task,
+                                     &xHigherPriorityTaskWoken);
         sbv_rtos_port_yield_fromISR(xHigherPriorityTaskWoken);
     }
 }
 
-uint8_t*
-sbv_can_stm32f1xx_rcv_data (uint8_t *length, uint16_t *std_id)
+uint16_t
+sbv_can_stm32f1xx_rcv_data (sbv_can_instance_t *can_instance,
+                            uint8_t *rcv_buffer, uint16_t buffer_length,
+                            uint16_t rcv_timeout_ms)
 {
+    uint16_t rx_buffer_size;
     sbv_rtos_tick_type_t tick_to_wait;
 
-    tick_to_wait = SBV_CAN_RX_TIMEOUT;
+    tick_to_wait = sbv_rtos_ms_to_tick(rcv_timeout_ms);
 
-    SBV_CAN_RX_BUFFER_MUTEX_LOCK;
-
-    sbv_can_instance.can_rx_notify_task = sbv_rtos_get_current_task_handle();
-
-    if (sbv_can_instance.can_reg_callback == SBV_FALSE)
+    if (can_instance->can_reg_callback == SBV_FALSE)
     {
-        sbv_can_stm32f1xx_callback_register (sbv_can_instance.can_handle);
-        sbv_can_instance.can_reg_callback = SBV_TRUE;
+        sbv_can_stm32f1xx_callback_register (can_instance->can_handle);
+        can_instance->can_reg_callback = SBV_TRUE;
     }
+
+    can_instance->can_rx_notify_task = sbv_rtos_get_current_task_handle();
 
     sbv_rtos_notify_take(SBV_RTOS_TRUE, tick_to_wait);
-    sbv_can_instance.can_rx_notify_task = NULL;
 
-    *length = (sbv_can_instance.can_rx_packet.sbv_can_header.DLC & 0xFF);
-    *std_id = (sbv_can_instance.can_rx_packet.sbv_can_header.StdId & 0xFFFF);
+    can_instance->can_rx_notify_task = NULL;
 
-    SBV_CAN_RX_BUFFER_MUTEX_UNLOCK;
+    rx_buffer_size = sbv_cqbuff_get_size (can_instance->can_rcv_buf);
+    if (rx_buffer_size == 0)
+        return 0;
 
-    /* Avoid loopback CAN packet self-originate */
-    if((*std_id & 0x1F) == SBV_CAN_STD_ID_NODE_ID)
-    {
-        *length = 0;
-        return NULL;
-    }
+    rx_buffer_size = (rx_buffer_size < buffer_length) ? rx_buffer_size : buffer_length;
+    rx_buffer_size = sbv_cqbuff_read (can_instance->can_rcv_buf,
+                                      rcv_buffer, rx_buffer_size);
 
-    return sbv_can_instance.can_rx_packet.sbv_can_data;
+    return rx_buffer_size;
 }
 #endif  /*STM32F1xx*/
