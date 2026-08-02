@@ -197,7 +197,6 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
 {
     uint8_t* rx_buffer_ret_pos;
     uint16_t rx_buffer_size;
-    uint32_t notify;
     sbv_rtos_tick_type_t tick_to_wait;
 
     if (! uart_instance)
@@ -210,14 +209,7 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
     uart_instance->uart_rx_notify_task = sbv_rtos_get_current_task_handle();
 
     /* Blocking call until timeout */
-    notify = sbv_rtos_notify_take(SBV_RTOS_TRUE, tick_to_wait);
-    if (notify == 0)
-    {
-        /* No notification is received after the timeout event */
-        uart_instance->uart_rx_notify_task = NULL;
-        SBV_UART_MUTEX_UNLOCK (uart_instance);
-        return 0;
-    }
+    sbv_rtos_notify_take(SBV_RTOS_TRUE, tick_to_wait);
 
     uart_instance->uart_rx_notify_task = NULL;
 
@@ -245,7 +237,8 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
         if (recv_buff && size > 0)
         {
             rx_buffer_size = (rx_buffer_size < size) ? rx_buffer_size : size;
-            sbv_cqbuff_read (uart_instance->uart_rx_buffer, recv_buff, rx_buffer_size);
+            rx_buffer_size = sbv_cqbuff_read (uart_instance->uart_rx_buffer,
+                                              recv_buff, rx_buffer_size);
         }
     }
 
