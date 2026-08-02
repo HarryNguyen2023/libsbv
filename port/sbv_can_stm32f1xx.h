@@ -10,7 +10,7 @@
 #define SBV_CAN_DATA_MAX_SIZE           (8)
 #define SBV_CAN_STD_ID_NODE_ID          (1)
 #define SBV_CAN_STD_ID_FILTER_ID_OFFSET (5)
-#define SBV_CAN_MAX_CHANNEL             (2)
+#define SBV_CAN_MAX_CHANNEL             (1)
 #define SBV_CAN_RCV_BUFFER_SIZE         (512)
 
 typedef CAN_HandleTypeDef       sbv_can_handle_t;

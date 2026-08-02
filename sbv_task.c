@@ -38,6 +38,9 @@ extern sbv_uart_dma_handle_t hdma_usart1_rx;
 sbv_gpio_num_t               uart_pin[2] = {SBV_GPIO_NUM_13, SBV_GPIO_NUM_7};
 sbv_uart_instance_t          sbv_uart_1;
 
+/* CAN router task's object */
+extern sbv_can_handle_t     hcan;
+sbv_can_instance_t          sbv_can_instance;
 
 void
 sbv_init(void)
@@ -49,7 +52,7 @@ sbv_init(void)
     sbv_uart_init(&sbv_uart_1, &huart1, &hdma_usart1_rx, SBV_UART_BAUDRATE_115200);
 
     /* CAN interface initialization */
-    // sbv_can_init(&hcan);
+    sbv_can_init(&sbv_can_instance, &hcan);
 
     /* Initialize the robot control system */
     sbv_control_balance_init(&sbv_control_balance, &sbv_imu_instance, &sbv_i2c_1, &hi2c1);
