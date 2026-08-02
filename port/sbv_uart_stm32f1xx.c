@@ -168,11 +168,8 @@ sbv_uart_stm32f1xx_rx_hw_callback(sbv_uart_handle_t* uart_handle, uint16_t uart_
         return;
     }
 
-    if (sbv_cqbuff_is_empty(uart_instance->uart_rx_buffer))
-    {
-        uart_instance->uart_rx_buffer->head = 0;
-        uart_instance->uart_rx_buffer->rear = 0;
-    }
+    uart_instance->uart_rx_buffer->head = (uart_instance->uart_rx_buffer->head == -1) \
+                                                ? 0: uart_instance->uart_rx_buffer->head;
 
     uart_instance->uart_rx_buffer->head = (uart_instance->uart_rx_buffer->head + \
                                             uart_rx_size) % uart_instance->uart_rx_buffer->capacity;
@@ -233,6 +230,8 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
     {
         (*uart_instance->uart_rx_cb) (rx_buffer_ret_pos, rx_buffer_size);
         /* Update current rear pointer position */
+        uart_instance->uart_rx_buffer->rear = (uart_instance->uart_rx_buffer->rear == -1) \
+                                                ? 0: uart_instance->uart_rx_buffer->rear;
         uart_instance->uart_rx_buffer->rear = (uart_instance->uart_rx_buffer->rear + rx_buffer_size) \
                                                 % uart_instance->uart_rx_buffer->capacity;
     }
