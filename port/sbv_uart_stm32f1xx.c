@@ -93,8 +93,6 @@ sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* 
         /* LOG */
         return SBV_ERROR;
     }
-    uart_instance->uart_rx_buffer->head   = 0;
-    uart_instance->uart_rx_buffer->rear   = 0;
 
     uart_instance->uart_handle            = uart_handle;
     uart_instance->uart_rx_dma_handle     = uart_dma_handle;
@@ -168,6 +166,12 @@ sbv_uart_stm32f1xx_rx_hw_callback(sbv_uart_handle_t* uart_handle, uint16_t uart_
     {
         /* LOG */
         return;
+    }
+
+    if (sbv_cqbuff_is_empty(uart_instance->uart_rx_buffer))
+    {
+        uart_instance->uart_rx_buffer->head = 0;
+        uart_instance->uart_rx_buffer->rear = 0;
     }
 
     uart_instance->uart_rx_buffer->head = (uart_instance->uart_rx_buffer->head + \

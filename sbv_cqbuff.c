@@ -50,7 +50,8 @@ int sbv_cqbuff_is_full (sbv_cqbuff* buff)
   if (! buff)
     return 0;
 
-  return (buff->head == buff->rear);
+  return (buff->head == buff->rear
+          && buff->head != -1);
 }
 
 int sbv_cqbuff_avail_size (sbv_cqbuff* buff)
