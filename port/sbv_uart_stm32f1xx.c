@@ -9,10 +9,10 @@
 struct sbv_uart_instances_list_t sbv_uart_instances_list = {0};
 
 #define SBV_UART_MUTEX_LOCK(Instance) \
-        sbv_rtos_mutex_lock(Instance->mutex)
+        sbv_rtos_mutex_lock(Instance->mu)
 
 #define SBV_UART_MUTEX_UNLOCK(Instance) \
-        sbv_rtos_mutex_unlock(Instance->mutex)
+        sbv_rtos_mutex_unlock(Instance->mu)
 
 #define sbv_uart_stm32f1xx_rx_hw_callback \
         HAL_UARTEx_RxEventCallback
@@ -74,7 +74,8 @@ sbv_uart_stm32f1xx_rx_idle_deteciton_start (sbv_uart_handle_t* uart_handle,
 
 int
 sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* uart_handle,
-                         sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate)
+                         sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate,
+                         void *ununsed)
 {
     if(! uart_instance || ! uart_handle || ! uart_dma_handle)
         return SBV_ERROR;
@@ -101,7 +102,7 @@ sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* 
     uart_instance->uart_rx_notify_task    = NULL;
 
     /* Create the mutex for the UART channel */
-    sbv_rtos_mutex_create(uart_instance->mutex);
+    sbv_rtos_mutex_create(uart_instance->mu);
 
     /* Start to register for UART DMA Idle line Interrupt callback */
     sbv_uart_stm32f1xx_rx_idle_deteciton_start (uart_handle, uart_dma_handle,
@@ -131,7 +132,7 @@ sbv_uart_stm32f1xx_send_data(sbv_uart_instance_t* uart_instance, uint8_t* uart_t
 {
     int ret = SBV_OK;
 
-    if(! uart_instance || ! uart_tx_data)
+    if(! uart_instance || ! uart_tx_data || uart_tx_size == 0)
         return SBV_ERROR;
 
     SBV_UART_MUTEX_LOCK (uart_instance);
@@ -213,6 +214,9 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
 
     uart_instance->uart_rx_notify_task = NULL;
 
+    uart_instance->uart_rx_buffer->rear = (uart_instance->uart_rx_buffer->rear == -1) \
+                                                ? 0: uart_instance->uart_rx_buffer->rear;
+
     rx_buffer_ret_pos = uart_instance->uart_rx_buffer->buff + \
                             uart_instance->uart_rx_buffer->rear;
 
@@ -227,8 +231,6 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
     {
         (*uart_instance->uart_rx_cb) (rx_buffer_ret_pos, rx_buffer_size);
         /* Update current rear pointer position */
-        uart_instance->uart_rx_buffer->rear = (uart_instance->uart_rx_buffer->rear == -1) \
-                                                ? 0: uart_instance->uart_rx_buffer->rear;
         uart_instance->uart_rx_buffer->rear = (uart_instance->uart_rx_buffer->rear + rx_buffer_size) \
                                                 % uart_instance->uart_rx_buffer->capacity;
     }

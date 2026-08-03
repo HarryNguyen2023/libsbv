@@ -20,10 +20,11 @@ struct sbv_uart_hw_cb_t sbv_uart_hw_cb = {
 
 int
 sbv_uart_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* uart_handle,
-               sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate)
+               sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate,
+               void *uart_pin)
 {
     if (sbv_uart_hw_cb.sbv_uart_init)
-        return (sbv_uart_hw_cb.sbv_uart_init) (uart_instance, uart_handle, uart_dma_handle, baudrate);
+        return (sbv_uart_hw_cb.sbv_uart_init) (uart_instance, uart_handle, uart_dma_handle, baudrate, uart_pin);
 
     return SBV_ERROR;
 }

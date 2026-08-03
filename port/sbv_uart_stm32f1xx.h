@@ -16,7 +16,7 @@ typedef struct sbv_uart_instance_t sbv_uart_instance_t;
 
 struct sbv_uart_instance_t
 {
-    sbv_rtos_mutex_t        mutex;  
+    sbv_rtos_mutex_t        mu;  
     sbv_cqbuff*             uart_rx_buffer;
     sbv_uart_handle_t*      uart_handle;
     sbv_uart_dma_handle_t*  uart_rx_dma_handle;
@@ -31,7 +31,8 @@ struct sbv_uart_instances_list_t {
 
 int
 sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* uart_handle,
-                         sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate);
+                         sbv_uart_dma_handle_t* uart_dma_handle, sbv_uart_baudrate_t baudrate,
+                         void *ununsed);
 int
 sbv_uart_stm32f1xx_send_data (sbv_uart_instance_t* sbv_uart_instance, uint8_t* uart_tx_data,
                               uint16_t uart_tx_size, uint16_t timeout_ms);

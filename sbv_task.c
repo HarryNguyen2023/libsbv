@@ -49,7 +49,7 @@ sbv_init(void)
     sbv_gpio_init(SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, SBV_GPIO_MODE_OUTPUT);
 
     /* UART serial initialization */
-    sbv_uart_init(&sbv_uart_1, &huart1, &hdma_usart1_rx, SBV_UART_BAUDRATE_115200);
+    sbv_uart_init(&sbv_uart_1, &huart1, &hdma_usart1_rx, SBV_UART_BAUDRATE_115200, uart_pin);
 
     /* CAN interface initialization */
     sbv_can_init(&sbv_can_instance, &hcan);
