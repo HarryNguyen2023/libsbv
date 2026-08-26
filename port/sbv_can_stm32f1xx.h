@@ -33,7 +33,6 @@ typedef struct sbv_can_rx_pkt_t
 
 typedef struct sbv_can_instance_t
 {
-    uint8_t                 can_active;
     uint8_t                 can_reg_callback;
     sbv_cqbuff*             can_rcv_buf;
     sbv_can_handle_t*       can_handle;

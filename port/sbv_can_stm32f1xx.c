@@ -112,10 +112,9 @@ sbv_can_stm32f1xx_init(sbv_can_instance_t *can_instance,
     }
 
     /*Intiiate CAN_RX filtering*/
-    sbv_can_stm32f1xx_filter_init (can_handle);
+    // sbv_can_stm32f1xx_filter_init (can_handle);
 
     memset (can_instance, 0, sizeof (sbv_can_instance_t));
-    can_instance->can_active          = SBV_TRUE;
     can_instance->can_rx_notify_task  = NULL;
     can_instance->can_handle          = can_handle;
     can_instance->can_reg_callback    = SBV_FALSE;
@@ -166,7 +165,7 @@ sbv_can_stm32f1xx_header_format (sbv_can_tx_pkt_t *can_pkt,
     uint32_t std_id;
     int sent_bytes;
 
-    if(!can_pkt || ! length)
+    if(! can_pkt || ! data || length == 0)
         return 0;
 
     memset(can_pkt, 0, sizeof(sbv_can_tx_pkt_t));
@@ -221,8 +220,7 @@ sbv_can_stm32f1xx_send_data(sbv_can_instance_t *can_instance,
     uint16_t total_tx_bytes = 0, cur_tx_bytes = 0;
     sbv_can_tx_pkt_t can_tx_pkt;
 
-    if(! can_instance || !data || (length == 0)
-        || !(can_instance->can_active))
+    if(! can_instance || ! data || (length == 0))
         return SBV_ERROR;
 
     while (total_tx_bytes < length)
@@ -250,8 +248,10 @@ void
 sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
 {
     sbv_can_instance_t *can_instance = NULL;
-    sbv_can_rx_pkt_t can_rx_packet;
     sbv_rtos_base_type_t xHigherPriorityTaskWoken = SBV_RTOS_FALSE;
+    sbv_can_rx_pkt_t can_rx_packet;
+
+    memset (&can_rx_packet, 0, sizeof(sbv_can_rx_pkt_t));
 
     can_instance = sbv_can_stm32f1xx_get_instance_by_handle (can_hanlde);
     if (can_instance == NULL)
@@ -264,10 +264,10 @@ sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
                          &(can_rx_packet.sbv_can_header),
                          can_rx_packet.sbv_can_data);
 
-    if (can_instance->can_active
-        && can_instance->can_rcv_buf)
+    if (can_instance->can_rcv_buf)
     {
-        sbv_cqbuff_write (can_instance->can_rcv_buf, &can_rx_packet, sizeof(sbv_can_rx_pkt_t));
+        sbv_cqbuff_write (can_instance->can_rcv_buf,
+                          &can_rx_packet, sizeof(sbv_can_rx_pkt_t));
     }
 
     if(can_instance->can_rx_notify_task != NULL)

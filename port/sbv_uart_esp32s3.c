@@ -57,7 +57,7 @@ sbv_uart_esp32s3_add_instance_to_list (sbv_uart_instance_t *uart_instance)
 static void
 sbv_uart_esp32s3_set_config(sbv_uart_cfg_t *uart_cfg, sbv_uart_baudrate_t baudrate)
 {
-    if(!uart_cfg)
+    if(! uart_cfg)
         return;
 
     uart_cfg->baud_rate     = baudrate;

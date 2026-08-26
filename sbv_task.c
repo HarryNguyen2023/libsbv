@@ -42,6 +42,11 @@ sbv_uart_instance_t          sbv_uart_1;
 extern sbv_can_handle_t     hcan;
 sbv_can_instance_t          sbv_can_instance;
 
+void sbv_led_init_blink (void);
+void sbv_task_init(void);
+void sbv_task_balance_control(void *param);
+void sbv_task_debug_console_task(void *param);
+
 void
 sbv_init(void)
 {
@@ -57,9 +62,22 @@ sbv_init(void)
     /* Initialize the robot control system */
     sbv_control_balance_init(&sbv_control_balance, &sbv_imu_instance, &sbv_i2c_1, &hi2c1);
 
+    /* Blink LED and wait for hardware system to stablize before starting software tasks */
+    sbv_led_init_blink();
+
     sbv_ota_update_init();
 
     sbv_task_init();
+}
+
+void
+sbv_led_init_blink (void)
+{
+    uint16_t blink_time_ms          = 5000;
+    uint16_t blink_toggle_time_ms   = 100;
+
+    for (uint8_t i = 0; i < (blink_time_ms / blink_toggle_time_ms); ++i)
+        sbv_gpio_toggle_pin (SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, blink_toggle_time_ms);
 }
 
 void
