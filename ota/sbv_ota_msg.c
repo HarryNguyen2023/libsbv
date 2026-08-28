@@ -7,6 +7,7 @@
 #include "sbv_cqbuff.h"
 #include "sbv_uart.h"
 #include "sbv_can.h"
+#include "sbv_ota_common.h"
 #include "sbv_ota.h"
 #include "sbv_ota_msg.h"
 
@@ -129,31 +130,7 @@ sbv_ota_msg_rcv (uint16_t required_length, uint16_t timeout_ms)
 uint32_t
 sbv_ota_msg_crc_calculate (uint8_t *buffer, uint32_t buffer_length)
 {
-#ifdef SBV_HW_CRC
-#ifdef STM32F1xx
-    return HAL_CRC_Calculate(&hcrc, buffer, buffer_length);
-#elif defined ESP32xx_IDF
-    return esp_crc32_le(0xFFFFFFFF, (uint8_t *)buffer, buffer_length);
-#endif /*STM32F1xx*/
-#else
-    uint32_t crc = 0xFFFFFFFF;
-
-    if(!buffer || !buffer_length)
-        return 0;
-
-    for (uint32_t i = 0; i < buffer_length; i++)
-    {
-        crc ^= *(buffer + i);
-        for (uint8_t j = 0; j < 32; j++)
-        {
-            if (crc & 0x80000000)
-                crc = (crc << 1) ^ 0x04C11DB7;
-            else
-                crc <<= 1;
-        }
-    }
-    return crc ^ 0xFFFFFFFF;
-#endif /*SBV_HW_CRC*/
+    return sbv_ota_calculate_crc (buffer, buffer_length);
 }
 
 int
@@ -485,7 +462,6 @@ void sbv_ota_state_end (sbv_ota_state_t current_state, void *data)
 {
     int ret;
     uint8_t *buff, retry_time;
-    uint16_t data_length;
 
     if (current_state != SBV_OTA_STATE_DATA)
     {

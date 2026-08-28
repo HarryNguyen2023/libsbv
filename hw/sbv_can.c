@@ -4,11 +4,6 @@
 #include "sbv_rtos.h"
 #include "sbv_cqbuff.h"
 #include "sbv_can.h"
-#include "sbv_ota.h"
-#include "sbv_ota_msg.h"
-
-sbv_rtos_mutex_t SBV_CAN_RX_BUFFER_MUTEX;
-sbv_rtos_mutex_t SBV_CAN_TX_BUFFER_MUTEX;
 
 sbv_can_hw_cb_t sbv_can_hw_cb = {
 #ifdef STM32F1xx

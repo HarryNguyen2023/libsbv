@@ -9,6 +9,7 @@
 #include "sbv_can.h"
 #include "sbv_uart.h"
 #include "sbv_debug.h"
+#include "sbv_ota_common.h"
 #include "sbv_ota.h"
 #include "sbv_ota_msg.h"
 #include "sbv_pid.h"
