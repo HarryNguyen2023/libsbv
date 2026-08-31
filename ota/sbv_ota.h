@@ -1,21 +1,19 @@
 #ifndef SBV_OTA_H
 #define SBV_OTA_H
 
-typedef struct sbv_ota_tx_thread_param_t
+typedef struct sbv_ota_installer_t
 {
-  uint32_t  data_length;
-  uint8_t   *data;
-} sbv_ota_tx_thread_param_t;
-
-#define SBV_OTA_DB_MUTEX_LOCK \
-        sbv_rtos_mutex_lock(SBV_OTA_DB_MUTEX)
-
-#define SBV_OTA_DB_MUTEX_UNLOCK \
-        sbv_rtos_mutex_unlock(SBV_OTA_DB_MUTEX)
+  sbv_rtos_queue_handle_t rx_queue;
+  sbv_rtos_queue_handle_t tx_queue;
+  sbv_rtos_mutex_t        mutex;
+  sbv_ota_state_t         state;
+  uint32_t                current_flash_page_addr;
+  uint8_t                 data[sizeof(sbv_ota_system_msg_t)];
+  uint8_t                 is_update_enable;
+  uint8_t                 is_updating;
+} sbv_ota_installer_t;
 
 void
 sbv_ota_update_init(void);
-uint8_t
-sbv_ota_get_available_slot_num (void);
 
 #endif /*SBV_OTA_H*/

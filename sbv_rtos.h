@@ -27,6 +27,8 @@
 #include "freertos/semphr.h"
 #endif
 
+#define STACK_SIZE_BASE         256
+
 #define sbv_rtos_ms_to_tick     pdMS_TO_TICKS
 #define SBV_RTOS_MAX_DELAY      sbv_rtos_ms_to_tick(1000)
 #define SBV_RTOS_FALSE          pdFALSE
@@ -40,6 +42,7 @@ typedef TaskHandle_t            sbv_rtos_task_handle_t;
 typedef TimeOut_t               sbv_rtos_timeout_t;
 typedef EventGroupHandle_t      sbv_event_group_handle_t;
 typedef EventBits_t             sbv_rtos_event_bits_t;
+typedef QueueHandle_t           sbv_rtos_queue_handle_t;
 
 #define sbv_rtos_mutex_create(M)  \
         M = xSemaphoreCreateMutex()
@@ -103,5 +106,14 @@ typedef EventBits_t             sbv_rtos_event_bits_t;
 
 #define sbv_rtos_get_tick() \
         xTaskGetTickCount()
+
+#define sbv_rtos_create_queue(L, S) \
+        xQueueCreate(L,S)
+
+#define sbv_rtos_queue_send(Q, I, T) \
+        xQueueSendToBack(Q, I, T)
+
+#define sbv_rtos_queue_rcv(Q, B, T)  \
+        xQueueReceive(Q, B, T)
 
 #endif  /*SBV_RTOS_H*/

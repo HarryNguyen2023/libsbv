@@ -20,7 +20,6 @@
 
 /************************ Gloabal variables declaration ***************************/
 /* Static task objects */
-#define STACK_SIZE_BASE 256
 static sbv_rtos_stack_type_t debug_stack[STACK_SIZE_BASE];
 static sbv_rtos_stack_type_t balance_crtl_stack[STACK_SIZE_BASE * 4];
 
