@@ -458,7 +458,7 @@ sbv_ota_process_update_fw_cmd (void)
     sbv_ota_send_system_msg_ack(sbv_ota_installer.tx_queue, SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS);
 
     sbv_rtos_mutex_unlock(sbv_ota_installer.mutex);
-    return 0;
+    return SBV_OK;
 
 ERR_EXIT:
     sbv_rtos_mutex_unlock(sbv_ota_installer.mutex);

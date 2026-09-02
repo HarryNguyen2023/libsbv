@@ -166,7 +166,6 @@ sbv_task_ota_update_fw_master (void* param)
 
 void sbv_ota_master_fsm_handle_state (void *data)
 {
-    struct sbv_ota_fsm_cb_t *state_cb;
     sbv_ota_state_t current_state, next_state;
 
     sbv_rtos_mutex_lock (sbv_ota_msg_master_handler.mu);
@@ -179,6 +178,8 @@ void sbv_ota_master_fsm_handle_state (void *data)
     {
         // LOG
         sbv_ota_master_fsm_reset ();
+
+        sbv_rtos_mutex_unlock (sbv_ota_msg_master_handler.mu);
         return;
     }
 

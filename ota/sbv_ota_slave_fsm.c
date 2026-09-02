@@ -13,7 +13,7 @@
 #define SBV_OTA_SLAVE_AND_INSTALLER_QUEUE_LEN    1
 #define SBV_OTA_SLAVE_FSM_PRIORITY               2
 
-#define SBV_OTA_SLAVE_RCV_BUFFER_SIZE   16
+#define SBV_OTA_SLAVE_RCV_BUFFER_SIZE   (SBV_OTA_PACKET_MAX_SIZE)
 #define SBV_OTA_SLAVE_MSG_TIMEOUT_MS    100
 #define SBV_OTA_BLOCKING_MAX_DELAY_MS   (UINT32_MAX)
 
@@ -184,7 +184,6 @@ sbv_task_ota_update_fw_slave (void* param)
 
 void sbv_ota_slave_fsm_handle_state (void *data)
 {
-    struct sbv_ota_fsm_cb_t *state_cb;
     sbv_ota_state_t current_state, next_state;
 
     sbv_rtos_mutex_lock (sbv_ota_msg_slave_handler.mu);
@@ -366,6 +365,8 @@ void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
         // LOG
     }
 
+    sbv_ota_msg_slave_handler.is_updating = SBV_TRUE;
+
     resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
     ret = sbv_ota_msg_send_resp (resp_type, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
@@ -383,7 +384,8 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
     int ret;
     uint8_t resp_type;
 
-    if (current_state != SBV_OTA_STATE_START)
+    if (current_state != SBV_OTA_STATE_START
+        || ! sbv_ota_slave_fsm_is_updating())
     {
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
         return;
@@ -418,7 +420,8 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
     int ret1, ret2;
     uint8_t resp_type;
 
-    if (current_state != SBV_OTA_STATE_HEADER)
+    if (current_state != SBV_OTA_STATE_HEADER
+        || ! sbv_ota_slave_fsm_is_updating())
     {
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
         return;
@@ -453,7 +456,8 @@ void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
     int ret;
     sbv_ota_upd_status upd_status;
 
-    if (current_state != SBV_OTA_STATE_DATA)
+    if (current_state != SBV_OTA_STATE_DATA
+        || ! sbv_ota_slave_fsm_is_updating())
     {
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
         return;
