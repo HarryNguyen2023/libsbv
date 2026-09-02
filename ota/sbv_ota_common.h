@@ -108,4 +108,8 @@ sbv_ota_is_valid_page_addr(const uint32_t slot_pag_addr);
 int
 sbv_ota_is_valid_fw_slot(uint16_t image_slot);
 
+int
+sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event_t event,
+                         void *data, uint16_t timeout_ms);
+
 #endif /* SBV_OTA_COMMON_H */

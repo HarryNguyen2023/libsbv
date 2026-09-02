@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "sbv.h"
+#include "sbv_rtos.h"
 #include "sbv_flash.h"
 #include "sbv_ota_common.h"
 
@@ -220,4 +221,25 @@ int
 sbv_ota_is_valid_fw_slot(uint16_t image_slot)
 {
     return (image_slot < SBV_OTA_SLOT_NO && SBV_OTA_SLOT_NO != SBV_OTA_INVALID_SLOT);
+}
+
+int
+sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event_t event,
+                         void *data, uint16_t timeout_ms) {
+    sbv_rtos_base_type_t status;
+    sbv_ota_system_msg_t msg;
+    uint16_t tick_to_wait;
+
+    tick_to_wait = sbv_rtos_ms_to_tick (timeout_ms);
+    memset(&msg, 0, sizeof(sbv_ota_system_msg_t));
+
+    msg.event = event;
+    msg.data  = data;
+    status = sbv_rtos_queue_send (queue, &msg, tick_to_wait);
+    if (status != SBV_RTOS_TRUE) {
+        // LOG
+        return -1;
+    }
+
+    return SBV_OK;
 }

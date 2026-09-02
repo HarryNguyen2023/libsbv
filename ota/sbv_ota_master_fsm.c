@@ -6,16 +6,18 @@
 #include "sbv_cqbuff.h"
 #include "sbv_ota_common.h"
 #include "sbv_ota_msg.h"
+#include "sbv_ota_fsm_common.h"
 #include "sbv_ota_master_fsm.h"
 
 #define SBV_OTA_MASTER_TX_MAX_RETRY    5
 #define SBV_OTA_MASTER_RX_QUEUE_LEN    5
 #define SBV_OTA_MASTER_PRIO            2
 
-#define SBV_OTA_MASTER_RCV_BUFFER_SIZE 16
-#define SBV_OTA_MASTER_MSG_TIMEOUT_MS  100
+#define SBV_OTA_MASTER_RCV_BUFFER_SIZE      16
+#define SBV_OTA_MASTER_MSG_TIMEOUT_MS       100
+#define SBV_OTA_MASTER_END_MSG_TIMEOUT_MS   (10 * 1000)
 
-#define SBV_OTA_NEXT_STATE(NS,T,ACK) \
+#define SBV_OTA_MASTER_NEXT_STATE(NS,T,ACK) \
     ((T) == SBV_OTA_MASTER_TX_MAX_RETRY) ? SBV_OTA_STATE_IDLE : \
         (((ACK)!=SBV_TRUE) ? SBV_OTA_STATE_IDLE : NS)
 
@@ -26,8 +28,8 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data);
 void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data);
 
 void sbv_task_ota_update_fw_master (void* param);
-int sbv_ota_master_fsm_handle_resp(void *param, uint16_t timeout_ms);
-int sbv_ota_master_fsm_handle_report(void *param, uint16_t timeout_ms);
+int sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms);
+int sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms);
 
 static sbv_rtos_stack_type_t sbv_ota_master_fsm_stack[STACK_SIZE_BASE * 4];
 sbv_rtos_task_handle_t       sbv_ota_master_handle;
@@ -37,12 +39,7 @@ sbv_ota_msg_master_handler_t sbv_ota_msg_master_handler;
 sbv_rtos_queue_handle_t sbv_ota_master_rx_queue;
 static uint8_t rcv_buffer[SBV_OTA_MASTER_RCV_BUFFER_SIZE];
 
-struct sbv_ota_master_fsm_cb_t {
-    sbv_ota_state_t next_state;
-    void            (*state_func) (sbv_ota_state_t, void *);
-};
-
-struct sbv_ota_master_fsm_cb_t sbv_ota_master_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STATE_MAX] = {
+struct sbv_ota_fsm_cb_t sbv_ota_master_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STATE_MAX] = {
     {{SBV_OTA_STATE_IDLE,   sbv_ota_master_fsm_idle},
      {SBV_OTA_STATE_START,  sbv_ota_master_fsm_start},
      {SBV_OTA_STATE_HEADER, sbv_ota_master_fsm_idle},
@@ -104,6 +101,8 @@ sbv_ota_master_fsm_reset (void)
     sbv_ota_msg_master_handler.is_updating  = SBV_FALSE;
     sbv_ota_msg_master_handler.is_abort     = SBV_FALSE;
     sbv_ota_msg_master_handler.is_ack       = SBV_FALSE;
+
+    sbv_cqbuff_flush (sbv_ota_msg_master_handler.data_queue);
 }
 
 static uint8_t
@@ -165,26 +164,15 @@ sbv_task_ota_update_fw_master (void* param)
     }
 }
 
-static int
-sbv_ota_master_fsm_is_valid_state (sbv_ota_state_t state)
-{
-    return (state >= SBV_OTA_STATE_IDLE && state < SBV_OTA_STATE_MAX);
-}
-
 void sbv_ota_master_fsm_handle_state (void *data)
 {
-    struct sbv_ota_master_fsm_cb_t *state_cb;
+    struct sbv_ota_fsm_cb_t *state_cb;
     sbv_ota_state_t current_state, next_state;
 
     sbv_rtos_mutex_lock (sbv_ota_msg_master_handler.mu);
 
     current_state = sbv_ota_master_fsm_get_current_state();
     next_state    = sbv_ota_master_fsm_get_next_state();
-
-    if (current_state == next_state
-        || ! (sbv_ota_master_fsm_is_valid_state (current_state))
-        || ! (sbv_ota_master_fsm_is_valid_state (next_state)))
-        return;
 
     if (next_state == SBV_OTA_STATE_IDLE
         || sbv_ota_master_fsm_is_update_aborted())
@@ -194,15 +182,9 @@ void sbv_ota_master_fsm_handle_state (void *data)
         return;
     }
 
-    state_cb = &sbv_ota_master_fsm_state[current_state][next_state];
-    if (! state_cb)
-    {
-        // LOG
-        return;
-    }
-
+    sbv_ota_fsm_handle_state (sbv_ota_master_fsm_state,
+                              current_state, next_state, data);
     sbv_ota_msg_master_handler.state = next_state;
-    (*state_cb->state_func) (current_state, data);
 
     sbv_rtos_mutex_unlock (sbv_ota_msg_master_handler.mu);
 }
@@ -249,9 +231,9 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
         break;
     }
 
-    sbv_ota_msg_master_handler.next_state = SBV_OTA_NEXT_STATE (SBV_OTA_STATE_HEADER,
-                                                                retry_time,
-                                                                sbv_ota_master_fsm_is_acknowledged());
+    sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE (SBV_OTA_STATE_HEADER,
+                                                                       retry_time,
+                                                                       sbv_ota_master_fsm_is_acknowledged());
 
     return;
 }
@@ -297,9 +279,9 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
         break;
     }
 
-    sbv_ota_msg_master_handler.next_state = SBV_OTA_NEXT_STATE (SBV_OTA_STATE_DATA,
-                                                                retry_time,
-                                                                sbv_ota_master_fsm_is_acknowledged());
+    sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE (SBV_OTA_STATE_DATA,
+                                                                       retry_time,
+                                                                       sbv_ota_master_fsm_is_acknowledged());
 
     return;
 }
@@ -354,9 +336,9 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
     
     
 
-    sbv_ota_msg_master_handler.next_state = SBV_OTA_NEXT_STATE (SBV_OTA_STATE_END,
-                                                                retry_time,
-                                                                sbv_ota_master_fsm_is_acknowledged());
+    sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE(SBV_OTA_STATE_END,
+                                                                      retry_time,
+                                                                      sbv_ota_master_fsm_is_acknowledged());
 
     return;
 }
@@ -385,7 +367,7 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         }
 
         /* This function will call the callback function for handling respose from peer */
-        ret = sbv_ota_master_fsm_handle_report (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
+        ret = sbv_ota_master_fsm_handle_report (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_END_MSG_TIMEOUT_MS);
         if (ret != SBV_OK)
         {
             /* LOG */
@@ -397,16 +379,16 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         break;
     }
 
-    sbv_ota_msg_master_handler.next_state = SBV_OTA_NEXT_STATE (SBV_OTA_STATE_IDLE,
-                                                                retry_time,
-                                                                sbv_ota_master_fsm_is_acknowledged());
+    sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE (SBV_OTA_STATE_IDLE,
+                                                                       retry_time,
+                                                                       sbv_ota_master_fsm_is_acknowledged());
     sbv_ota_msg_master_handler.is_updating = SBV_FALSE;
 
     return;
 }
 
 int
-sbv_ota_master_fsm_handle_resp(void *param, uint16_t timeout_ms)
+sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
 {
     int ret;
     sbv_ota_resp_pkt_t resp_pkt;
@@ -420,9 +402,9 @@ sbv_ota_master_fsm_handle_resp(void *param, uint16_t timeout_ms)
         return -1;
     }
 
-    ret = sbv_ota_master_fsm_get_rcv_data (master_handler->data_queue, &resp_pkt,
-                                           rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
-                                           sizeof(sbv_ota_resp_pkt_t), timeout_ms);
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &resp_pkt,
+                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
+                                    sizeof(sbv_ota_resp_pkt_t), timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -439,7 +421,7 @@ sbv_ota_master_fsm_handle_resp(void *param, uint16_t timeout_ms)
 }
 
 int
-sbv_ota_master_fsm_handle_report(void *param, uint16_t timeout_ms)
+sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
 {
     int ret;
     sbv_ota_report_pkt_t report_pkt;
@@ -453,9 +435,9 @@ sbv_ota_master_fsm_handle_report(void *param, uint16_t timeout_ms)
         return -1;
     }
 
-    ret = sbv_ota_master_fsm_get_rcv_data (master_handler->data_queue, &report_pkt,
-                                           rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
-                                           sizeof(sbv_ota_report_pkt_t), timeout_ms);
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &report_pkt,
+                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
+                                    sizeof(sbv_ota_report_pkt_t), timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         return ret;

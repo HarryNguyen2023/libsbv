@@ -37,7 +37,7 @@ sbv_ota_msg_send (uint8_t *data, uint16_t length, uint16_t timeout_ms)
 }
 
 int
-sbv_ota_rcv_data (void* param, uint8_t data[], uint16_t length, uint16_t timeout_ms)
+sbv_ota_rcv_data (void* param, uint8_t data[], uint16_t length, uint32_t timeout_ms)
 {
     if (sbv_ota_msg_hw_cb.sbv_ota_rcv_data)
     {
@@ -258,6 +258,14 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt)
         goto ERR_EXIT;
     }
 
+    // TODO: Check fw timestampt vs NOW
+
+    // Check firmware size limit
+    if (head_pkt->data_info.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
+        // LOG
+        return -1;
+    }
+
     return 0;
 
 ERR_EXIT:
@@ -370,8 +378,8 @@ ERR_EXIT:
 }
 
 int
-sbv_ota_master_fsm_get_rcv_data (sbv_cqbuff *queue, void *packet, uint8_t rcv_buffer[],
-                                 uint16_t buffer_size, int data_size, uint16_t timeout_ms)
+sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue, void *packet, uint8_t rcv_buffer[],
+                          uint16_t buffer_size, int data_size, uint32_t timeout_ms)
 {
     int ret, data_len;
     uint32_t start_tick = sbv_rtos_get_tick();
@@ -380,8 +388,6 @@ sbv_ota_master_fsm_get_rcv_data (sbv_cqbuff *queue, void *packet, uint8_t rcv_bu
         // LOG
         return -1;
     }
-
-    sbv_cqbuff_flush (queue);
 
     while ((sbv_rtos_get_tick() - start_tick < sbv_rtos_ms_to_tick(timeout_ms))
             && sbv_cqbuff_get_size (queue) < data_size) {

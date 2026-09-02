@@ -30,7 +30,7 @@
 #define STACK_SIZE_BASE         256
 
 #define sbv_rtos_ms_to_tick     pdMS_TO_TICKS
-#define SBV_RTOS_MAX_DELAY      sbv_rtos_ms_to_tick(1000)
+#define SBV_RTOS_MAX_DELAY      portMAX_DELAY
 #define SBV_RTOS_FALSE          pdFALSE
 #define SBV_RTOS_TRUE           pdTRUE
 

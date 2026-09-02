@@ -38,13 +38,6 @@ typedef enum sbv_ota_upd_status
   SBV_OTA_UDP_FAILED,
 } sbv_ota_upd_status;
 
-/* OTA meta data info */
-typedef struct sbv_ota_data_info_t
-{
-	uint32_t packet_size;
-	uint32_t packet_crc;
-} sbv_ota_data_info_t;
-
 /*
  * OTA Command format
  *
@@ -139,7 +132,7 @@ typedef struct sbv_ota_msg_hw_cb_t
 {
   int (*sbv_ota_msg_send) (uint8_t, uint8_t *, uint16_t, uint16_t);
   int (*sbv_ota_reg_cb) (int (*rx_cb)(uint8_t *, const uint16_t));
-  int (*sbv_ota_rcv_data) (void*, uint8_t[], uint16_t, uint16_t);
+  int (*sbv_ota_rcv_data) (void*, uint8_t[], uint16_t, uint32_t);
 } sbv_ota_msg_hw_cb_t;
 
 int
@@ -165,7 +158,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt);
 int
 sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt);
 int
-sbv_ota_master_fsm_get_rcv_data (sbv_cqbuff *queue, void *packet, uint8_t rcv_buffer[],
-                                 uint16_t buffer_size, int data_size, uint16_t timeout_ms);
+sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue, void *packet, uint8_t rcv_buffer[],
+                          uint16_t buffer_size, int data_size, uint32_t timeout_ms);
 
 #endif /*SBV_OTA_MSG_H*/

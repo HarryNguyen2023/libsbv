@@ -15,16 +15,15 @@
 #define SBV_OTA_QUEUE_LEN               5
 #define SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS 5
 
-
-sbv_rtos_task_handle_t sbv_ota_master_update_fw_handle;
-static sbv_rtos_stack_type_t sbv_ota_master_stack[STACK_SIZE_BASE * 4];
+sbv_rtos_task_handle_t sbv_ota_update_fw_handle;
+static sbv_rtos_stack_type_t sbv_ota_fw_update_stack[STACK_SIZE_BASE * 4];
 
 void sbv_ota_update_fw_thread (void *param);
 
 extern volatile sbv_ota_general_cfg *sbv_ota_cfg_flash;
 
 sbv_rtos_queue_handle_t sbv_ota_installer_rx_queue;
-sbv_rtos_queue_handle_t sbv_ota_installer_tx_queue;
+extern sbv_rtos_queue_handle_t sbv_ota_slave_rx_installer_tx_queue;
 
 sbv_ota_installer_t sbv_ota_installer;
 
@@ -44,20 +43,13 @@ sbv_ota_update_init(void)
         return;
     }
 
-    sbv_ota_installer_tx_queue = sbv_rtos_create_queue (SBV_OTA_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
-    if (! sbv_ota_installer_tx_queue)
-    {
-        // LOG
-        return;
-    }
-
     sbv_ota_installer.rx_queue = sbv_ota_installer_rx_queue;
-    sbv_ota_installer.tx_queue = sbv_ota_installer_tx_queue;
+    sbv_ota_installer.tx_queue = sbv_ota_slave_rx_installer_tx_queue;
 
     sbv_rtos_mutex_create (sbv_ota_installer.mutex);
 
     sbv_rtos_task_create(sbv_ota_update_fw_thread, "update_fw", STACK_SIZE_BASE * 4,
-                         NULL, SBV_OTA_UPDATE_FW_PRIO, sbv_ota_master_stack, &sbv_ota_master_update_fw_handle);
+                         NULL, SBV_OTA_UPDATE_FW_PRIO, sbv_ota_fw_update_stack, &sbv_ota_update_fw_handle);
 }
 
 uint8_t
@@ -101,40 +93,12 @@ sbv_ota_set_update_status (uint8_t is_updating)
 
 int
 sbv_ota_send_system_msg_ack (sbv_rtos_queue_handle_t queue, uint16_t timeout_ms) {
-    sbv_rtos_base_type_t status;
-    sbv_ota_system_msg_t msg;
-    uint16_t tick_to_wait;
-
-    tick_to_wait = sbv_rtos_ms_to_tick (timeout_ms);
-    memset(&msg, 0, sizeof(sbv_ota_system_msg_t));
-
-    msg.event = SBV_OTA_EVENT_ACK;
-    status = sbv_rtos_queue_send (queue, &msg, tick_to_wait);
-    if (status != SBV_RTOS_TRUE) {
-        // LOG
-        return -1;
-    }
-
-    return SBV_OK;
+    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_ACK, NULL, timeout_ms);
 }
 
 int
 sbv_ota_send_system_msg_abort (sbv_rtos_queue_handle_t queue, uint16_t timeout_ms) {
-    sbv_rtos_base_type_t status;
-    sbv_ota_system_msg_t msg;
-    uint16_t tick_to_wait;
-
-    tick_to_wait = sbv_rtos_ms_to_tick (timeout_ms);
-    memset(&msg, 0, sizeof(sbv_ota_system_msg_t));
-
-    msg.event = SBV_OTA_EVENT_ABORT;
-    status = sbv_rtos_queue_send (queue, &msg, tick_to_wait);
-    if (status != SBV_RTOS_TRUE) {
-        // LOG
-        return -1;
-    }
-
-    return SBV_OK;
+    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_ABORT, NULL, timeout_ms);
 }
 
 void
