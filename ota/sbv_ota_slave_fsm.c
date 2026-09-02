@@ -86,7 +86,7 @@ sbv_ota_slave_fw_installer_task_t sbv_ota_slave_fw_installer_tasks[4] = {
     sbv_ota_slave_fsm_start_fw_update,
     sbv_ota_slave_fsm_send_fw_metadata_to_installelr,
     sbv_ota_slave_fsm_send_img_to_installer,
-    sbv_ota_slave_fsm_stop_fw_update,
+    sbv_ota_slave_fsm_stop_fw_update
 };
 
 int
@@ -236,13 +236,13 @@ sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeo
         return ret;
     }
 
-    ret = sbv_ota_msg_rx_cmd_packet_validate (&cmd_pkt);
+    ret = sbv_ota_msg_rx_cmd_packet_validate (&cmd_pkt, cmd_type, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
         return ret;
     }
 
-    return (cmd_pkt.cmd == cmd_type) ? SBV_OK : SBV_ERROR;
+    return SBV_OK;
 }
 
 int
@@ -268,7 +268,7 @@ sbv_ota_slave_fsm_handle_header(void *param, uint32_t timeout_ms)
         return ret;
     }
 
-    ret = sbv_ota_msg_rx_header_packet_validate (&header_pkt);
+    ret = sbv_ota_msg_rx_header_packet_validate (&header_pkt, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -318,7 +318,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
         goto ERR_EXIT;
     }
 
-    ret = sbv_ota_msg_rx_data_packet_validate (data_pkt, rcv_size);
+    ret = sbv_ota_msg_rx_data_packet_validate (data_pkt, rcv_size, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -369,7 +369,9 @@ void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    ret = sbv_ota_msg_send_resp (resp_type, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_resp_pkt_t);
+
+    ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         /* LOG */
     }
@@ -398,7 +400,9 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    ret = sbv_ota_msg_send_resp (resp_type, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_resp_pkt_t);
+
+    ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret < 0) {
         /* LOG */
     }
@@ -434,7 +438,9 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    ret2 = sbv_ota_msg_send_resp (resp_type, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_resp_pkt_t);
+
+    ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret2 != SBV_OK)
     {
         /* LOG */
@@ -484,7 +490,10 @@ void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
 SEND_REPORT:
     upd_status = (ret == SBV_OK) ? SBV_OTA_UPD_SUCCESS : SBV_OTA_UDP_FAILED;
 
-    ret = sbv_ota_msg_send_report (upd_status, &(sbv_ota_msg_slave_handler.new_fw_metadata), SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_report_pkt_t);
+
+    ret = sbv_ota_msg_send_report (upd_status, &(sbv_ota_msg_slave_handler.new_fw_metadata),
+                                   sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
     }

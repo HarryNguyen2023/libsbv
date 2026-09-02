@@ -13,6 +13,9 @@ typedef struct sbv_ota_msg_master_handler_t
   uint8_t                 is_ack;
   uint8_t                 is_abort;
 
+  uint16_t                seq_num;
+  uint16_t                peer_seq_num;
+
   sbv_rtos_mutex_t        mu;
   sbv_rtos_queue_handle_t rx_queue;
 } sbv_ota_msg_master_handler_t;

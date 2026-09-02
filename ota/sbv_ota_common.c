@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "sbv.h"
@@ -239,6 +240,21 @@ sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event
     if (status != SBV_RTOS_TRUE) {
         // LOG
         return -1;
+    }
+
+    return SBV_OK;
+}
+
+uint16_t
+sbv_ota_get_random_seq_number (void) {
+    return (rand() % 0xFFFF);
+}
+
+int
+sbv_ota_seq_num_validate (uint16_t seq_num, uint16_t expected_seq_num) {
+    if (expected_seq_num != seq_num) {
+        // LOG
+        return (expected_seq_num < seq_num) ? SBV_ERROR : SBV_BUSY;
     }
 
     return SBV_OK;

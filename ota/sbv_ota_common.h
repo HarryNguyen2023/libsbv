@@ -111,5 +111,8 @@ sbv_ota_is_valid_fw_slot(uint16_t image_slot);
 int
 sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event_t event,
                          void *data, uint16_t timeout_ms);
-
+uint16_t
+sbv_ota_get_random_seq_number (void);
+int
+sbv_ota_seq_num_validate (uint16_t seq_num, uint16_t expected_seq_num);
 #endif /* SBV_OTA_COMMON_H */

@@ -102,6 +102,9 @@ sbv_ota_master_fsm_reset (void)
     sbv_ota_msg_master_handler.is_abort     = SBV_FALSE;
     sbv_ota_msg_master_handler.is_ack       = SBV_FALSE;
 
+    sbv_ota_msg_master_handler.seq_num      = 0;
+    sbv_ota_msg_master_handler.peer_seq_num = 0;
+
     sbv_cqbuff_flush (sbv_ota_msg_master_handler.data_queue);
 }
 
@@ -207,11 +210,13 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
         return;
     }
 
+    sbv_ota_msg_master_handler.seq_num = sbv_ota_get_random_seq_number ();
+
     retry_time = 0;
     while (retry_time < sbv_ota_msg_master_handler.max_retry)
     {
         sbv_ota_msg_master_handler.is_ack = SBV_FALSE;
-        ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_START, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
+        ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_START, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
             /* LOG */
@@ -255,11 +260,13 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
     //
     //
 
+    sbv_ota_msg_master_handler.seq_num += sizeof (sbv_ota_header_pkt_t);
+
     retry_time = 0;
     while (retry_time < sbv_ota_msg_master_handler.max_retry)
     {
         sbv_ota_msg_master_handler.is_ack = SBV_FALSE;
-        ret = sbv_ota_msg_send_data_header (images, &data_info, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
+        ret = sbv_ota_msg_send_data_header (images, &data_info, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
             /* LOG */
@@ -308,11 +315,13 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
         chunk_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? SBV_OTA_DATA_MAX_SIZE : image_length;
         image_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? (image_length - SBV_OTA_DATA_MAX_SIZE) : 0;
 
+        sbv_ota_msg_master_handler.seq_num += (chunk_length + sizeof (sbv_ota_data_pkt_t));
+
         retry_time   = 0;
         while (retry_time < sbv_ota_msg_master_handler.max_retry)
         {
             sbv_ota_msg_master_handler.is_ack = SBV_FALSE;
-            ret = sbv_ota_msg_send_data_frame (images, chunk_length, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
+            ret = sbv_ota_msg_send_data_frame (images, chunk_length, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
             if (ret < 0)
             {
                 /* LOG */
@@ -355,11 +364,13 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         return;
     }
 
+    sbv_ota_msg_master_handler.seq_num += sizeof (sbv_ota_cmd_pkt_t);
+
     retry_time = 0;
     while (retry_time < sbv_ota_msg_master_handler.max_retry)
     {
         sbv_ota_msg_master_handler.is_ack = SBV_FALSE;
-        ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_END, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
+        ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_END, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
             /* LOG */
@@ -411,7 +422,7 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
         return ret;
     }
 
-    ret = sbv_ota_msg_rx_resp_packet_validate (&resp_pkt);
+    ret = sbv_ota_msg_rx_resp_packet_validate (&resp_pkt, &(master_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -444,7 +455,7 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
         return ret;
     }
 
-    ret = sbv_ota_msg_rx_report_packet_validate (&report_pkt);
+    ret = sbv_ota_msg_rx_report_packet_validate (&report_pkt, &(master_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
         return ret;
