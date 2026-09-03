@@ -261,7 +261,7 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
     //
     //
 
-    sbv_ota_msg_master_handler.seq_num += sizeof (sbv_ota_header_pkt_t);
+    sbv_ota_msg_master_handler.seq_num += SBV_OTA_HEADER_PACKET_LEN;
 
     retry_time = 0;
     while (retry_time < sbv_ota_msg_master_handler.max_retry)
@@ -316,7 +316,7 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
         chunk_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? SBV_OTA_DATA_MAX_SIZE : image_length;
         image_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? (image_length - SBV_OTA_DATA_MAX_SIZE) : 0;
 
-        sbv_ota_msg_master_handler.seq_num += (chunk_length + sizeof (sbv_ota_data_pkt_t));
+        sbv_ota_msg_master_handler.seq_num += chunk_length;
 
         retry_time   = 0;
         while (retry_time < sbv_ota_msg_master_handler.max_retry)
@@ -365,7 +365,7 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         return;
     }
 
-    sbv_ota_msg_master_handler.seq_num += sizeof (sbv_ota_cmd_pkt_t);
+    sbv_ota_msg_master_handler.seq_num += SBV_OTA_CMD_PACKET_LEN;
 
     retry_time = 0;
     while (retry_time < sbv_ota_msg_master_handler.max_retry)

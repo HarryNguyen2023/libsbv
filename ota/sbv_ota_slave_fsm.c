@@ -259,6 +259,7 @@ sbv_ota_slave_fsm_handle_header(void *param, uint32_t timeout_ms)
         return -1;
     }
 
+    
     ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &header_pkt,
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_header_pkt_t), timeout_ms);
@@ -368,7 +369,7 @@ void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_resp_pkt_t);
+    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_RESP_PACKET_LEN;
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
@@ -399,7 +400,7 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_resp_pkt_t);
+    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_RESP_PACKET_LEN;
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret < 0) {
@@ -437,7 +438,7 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_resp_pkt_t);
+    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_RESP_PACKET_LEN;
 
     ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret2 != SBV_OK)
@@ -489,7 +490,7 @@ void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
 SEND_REPORT:
     upd_status = (ret == SBV_OK) ? SBV_OTA_UPD_SUCCESS : SBV_OTA_UDP_FAILED;
 
-    sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_report_pkt_t);
+    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_REP_PACKET_LEN;
 
     ret = sbv_ota_msg_send_report (upd_status, sbv_ota_msg_slave_handler.seq_num,
                                    &(sbv_ota_msg_slave_handler.new_fw_metadata),

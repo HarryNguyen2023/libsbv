@@ -332,10 +332,5 @@ sbv_ota_get_random_seq_number (void) {
 
 int
 sbv_ota_seq_num_validate (uint16_t seq_num, uint16_t expected_seq_num) {
-    if (expected_seq_num != seq_num) {
-        // LOG
-        return (expected_seq_num < seq_num) ? SBV_ERROR : SBV_BUSY;
-    }
-
-    return SBV_OK;
+    return (seq_num == expected_seq_num) ? SBV_OK : SBV_ERROR;
 }
