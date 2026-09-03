@@ -23,15 +23,17 @@ void sbv_ota_update_fw_thread (void *param);
 
 sbv_ota_installer_t sbv_ota_installer;
 
-void
+int
 sbv_ota_ipc_queue_init (sbv_ota_ipc_t *ipc) {
     if (! ipc) {
         // LOG
-        return;
+        return SBV_ERROR;
     }
 
     ipc->to_installer = sbv_rtos_create_queue (SBV_OTA_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
     ipc->to_slave_fsm = sbv_rtos_create_queue (SBV_OTA_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
+
+    return (ipc->to_installer && ipc->to_slave_fsm) ? SBV_OK : SBV_ERROR;
 }
 
 void

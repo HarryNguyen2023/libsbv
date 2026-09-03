@@ -166,7 +166,13 @@ sbv_task_debug_console_task(void *param)
 
 void
 sbv_task_ota_init (uint8_t is_master) {
-    sbv_ota_ipc_queue_init (&sbv_ota_queues);
+    int ret;
+
+    ret = sbv_ota_ipc_queue_init (&sbv_ota_queues);
+    if (ret != SBV_OK) {
+        // LOG
+        return;
+    }
 
     sbv_ota_update_init (&sbv_ota_queues);
     sbv_ota_slave_fsm_init (&sbv_ota_queues);
