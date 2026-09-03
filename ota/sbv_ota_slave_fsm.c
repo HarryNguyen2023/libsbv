@@ -40,8 +40,6 @@ sbv_rtos_task_handle_t       sbv_ota_slave_handle;
 
 sbv_ota_msg_slave_handler_t sbv_ota_msg_slave_handler;
 
-extern sbv_rtos_queue_handle_t sbv_ota_installer_rx_queue;
-sbv_rtos_queue_handle_t sbv_ota_slave_rx_installer_tx_queue;
 static uint8_t rcv_buffer[SBV_OTA_SLAVE_RCV_BUFFER_SIZE];
 
 struct sbv_ota_fsm_cb_t sbv_ota_slave_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STATE_MAX] = {
@@ -493,8 +491,9 @@ SEND_REPORT:
 
     sbv_ota_msg_slave_handler.seq_num += sizeof(sbv_ota_report_pkt_t);
 
-    ret = sbv_ota_msg_send_report (upd_status, &(sbv_ota_msg_slave_handler.new_fw_metadata),
-                                   sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    ret = sbv_ota_msg_send_report (upd_status, sbv_ota_msg_slave_handler.seq_num,
+                                   &(sbv_ota_msg_slave_handler.new_fw_metadata),
+                                   SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
     }

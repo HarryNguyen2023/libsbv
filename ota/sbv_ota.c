@@ -44,6 +44,9 @@ sbv_ota_update_init(void *param)
     sbv_ota_installer.is_updating               = SBV_FALSE;
     sbv_ota_installer.current_flash_page_addr   = 0;
 
+    sbv_ota_installer.inactive_slot = SBV_OTA_INVALID_SLOT;
+    sbv_ota_installer.slot_pag_add  = 0;
+
     ipc = (sbv_ota_ipc_t *)param;
     if (! ipc) {
         // LOG
@@ -116,6 +119,12 @@ sbv_ota_abort_fw_update (void)
     sbv_ota_installer.is_update_enable          = SBV_TRUE;
     sbv_ota_installer.is_updating               = SBV_FALSE;
     sbv_ota_installer.current_flash_page_addr   = 0;
+
+    memset (&(sbv_ota_installer.fw_metadata), 0, sizeof (sbv_ota_fw_metadata_t));
+    sbv_ota_installer.fw_data_addr  = NULL;
+
+    sbv_ota_installer.inactive_slot = SBV_OTA_INVALID_SLOT;
+    sbv_ota_installer.slot_pag_add  = 0;
 
     sbv_ota_send_system_msg_abort(sbv_ota_installer.tx_queue, SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS);
 
@@ -353,17 +362,8 @@ int
 sbv_ota_process_update_fw_cmd (void)
 {
     int ret;
-    uint8_t inactive_slot;
-    uint32_t slot_pag_add;
     sbv_ota_system_msg_t *rcv_msg;
-    sbv_ota_fw_metadata_t new_fw_meatdata;
-    sbv_ota_fw_metadata_t *fw_metadata = NULL;
-    uint8_t *fw_data = NULL;
-
-    slot_pag_add  = 0;
-    inactive_slot = SBV_OTA_INVALID_SLOT;
-    memset(&new_fw_meatdata, 0, sizeof(sbv_ota_fw_metadata_t));
-
+    
     sbv_rtos_mutex_lock(sbv_ota_installer.mutex);
 
     rcv_msg = (sbv_ota_system_msg_t *)(sbv_ota_installer.data);
@@ -382,22 +382,33 @@ sbv_ota_process_update_fw_cmd (void)
     switch (rcv_msg->event)
     {
     case SBV_OTA_EVENT_UDP_START:
+        uint8_t inactive_slot;
+        uint32_t slot_pag_add;
+        sbv_ota_fw_metadata_t *fw_metadata = NULL;
+
+        slot_pag_add  = 0;
+        inactive_slot = SBV_OTA_INVALID_SLOT;
         sbv_ota_set_update_status (SBV_TRUE);
 
         fw_metadata = (sbv_ota_fw_metadata_t *)rcv_msg->data;
-        memcpy (&new_fw_meatdata, fw_metadata, sizeof(sbv_ota_fw_metadata_t));
+        memcpy (&(sbv_ota_installer.fw_metadata), fw_metadata, sizeof(sbv_ota_fw_metadata_t));
 
-        ret = sbv_ota_fw_metadata_validate (&new_fw_meatdata, &slot_pag_add, &inactive_slot);
+        ret = sbv_ota_fw_metadata_validate (&(sbv_ota_installer.fw_metadata), &slot_pag_add, &inactive_slot);
         if (ret != SBV_OK)
         {
             /* LOG */
             goto ERR_EXIT;
         }
+
+        sbv_ota_installer.inactive_slot = inactive_slot;
+        sbv_ota_installer.slot_pag_add  = slot_pag_add;
         break;
 
     case SBV_OTA_EVENT_IMG_WRITE:
+        uint8_t *fw_data = NULL;
         fw_data = (uint8_t *)rcv_msg->data;
-        ret = sbv_ota_save_fw_image_to_flash (fw_data, new_fw_meatdata.fw_size, slot_pag_add);
+        ret = sbv_ota_save_fw_image_to_flash (fw_data, sbv_ota_installer.fw_metadata.fw_size,
+                                              sbv_ota_installer.slot_pag_add);
         if (ret != SBV_OK)
         {
             // LOG
@@ -406,7 +417,9 @@ sbv_ota_process_update_fw_cmd (void)
         break;
 
     case SBV_OTA_EVENT_UDP_FINALIZE:
-        ret = sbv_ota_handle_final_upd (slot_pag_add, inactive_slot, new_fw_meatdata);
+        ret = sbv_ota_handle_final_upd (sbv_ota_installer.slot_pag_add,
+                                        sbv_ota_installer.inactive_slot,
+                                        sbv_ota_installer.fw_metadata);
         if (ret != SBV_OK)
         {
             // LOG
