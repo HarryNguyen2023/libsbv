@@ -62,7 +62,7 @@ sbv_ota_msg_send_resp (uint8_t resp_type, uint16_t seq_num, uint16_t timeout_ms)
     resp_pkt.h.crc          = 0;
     resp_pkt.status 		= resp_type;
 
-	pkt_crc = sbv_ota_calculate_crc((uint8_t *)&resp_pkt, sizeof(sbv_ota_resp_pkt_t));
+	pkt_crc = sbv_ota_frame_crc((uint8_t *)&resp_pkt, sizeof(sbv_ota_resp_pkt_t));
     resp_pkt.h.crc = pkt_crc;
 
     return sbv_ota_msg_send((uint8_t *)&resp_pkt, sizeof(sbv_ota_resp_pkt_t), timeout_ms);
@@ -87,7 +87,7 @@ sbv_ota_msg_send_report (const sbv_ota_upd_status upd_status, uint16_t seq_num,
     report_pkt.status 		    = upd_status;
     memcpy (&report_pkt.upd_fw_metadata, fw_metadata, sizeof(sbv_ota_fw_metadata_t));
 
-	pkt_crc = sbv_ota_calculate_crc((uint8_t *)&report_pkt, sizeof(sbv_ota_report_pkt_t));
+	pkt_crc = sbv_ota_frame_crc((uint8_t *)&report_pkt, sizeof(sbv_ota_report_pkt_t));
     report_pkt.h.crc = pkt_crc;
 
     return sbv_ota_msg_send((uint8_t *)&report_pkt, sizeof(sbv_ota_report_pkt_t), timeout_ms);
@@ -105,7 +105,7 @@ sbv_ota_msg_send_cmd (sbv_ota_cmd_t cmd_type, uint16_t seq_num, uint16_t timeout
     cmd_pkt.h.crc           = 0;
     cmd_pkt.cmd 		    = cmd_type;
 
-	pkt_crc = sbv_ota_calculate_crc((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
+	pkt_crc = sbv_ota_frame_crc((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
     cmd_pkt.h.crc = pkt_crc;
 
     return sbv_ota_msg_send((uint8_t *)&cmd_pkt, sizeof(sbv_ota_cmd_pkt_t), timeout_ms);
@@ -120,7 +120,7 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info, ui
     if(! data || ! data_info)
         return -1;
 
-    data_crc = sbv_ota_calculate_crc((uint8_t *)data, data_info->fw_size);
+    data_crc = sbv_ota_frame_crc((uint8_t *)data, data_info->fw_size);
     if (data_crc != data_info->fw_crc)
     {
         /* LOG */
@@ -133,7 +133,7 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info, ui
     header_pkt.h.crc           = 0;
     memcpy (&header_pkt.data_info, data_info, sizeof (sbv_ota_fw_metadata_t));
 
-    pkt_crc = sbv_ota_calculate_crc((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t));
+    pkt_crc = sbv_ota_frame_crc((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t));
     header_pkt.h.crc = pkt_crc;
 
     return sbv_ota_msg_send((uint8_t *)&header_pkt, sizeof(sbv_ota_header_pkt_t), timeout_ms);
@@ -169,7 +169,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
     data_pkt->h.seq_num       = seq_num;
     data_pkt->h.crc           = 0;
     memcpy(data_pkt->data, data, data_length);
-    data_pkt->h.crc           = sbv_ota_calculate_crc((uint8_t *)data_pkt, pkt_length);
+    data_pkt->h.crc           = sbv_ota_frame_crc((uint8_t *)data_pkt, pkt_length);
 
     ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length, timeout_ms);
     if (ret < 0)
@@ -219,7 +219,7 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
 
     pkt_crc         = cmd_pkt->h.crc;
     cmd_pkt->h.crc  = 0;
-    new_crc         = sbv_ota_calculate_crc((uint8_t *)cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
+    new_crc         = sbv_ota_frame_crc((uint8_t *)cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
     if(pkt_crc != new_crc)
     {
         /* LOG */
@@ -269,7 +269,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
 
     pkt_crc         = head_pkt->h.crc;
     head_pkt->h.crc = 0;
-    new_crc         = sbv_ota_calculate_crc((uint8_t *)head_pkt, sizeof(sbv_ota_header_pkt_t));
+    new_crc         = sbv_ota_frame_crc((uint8_t *)head_pkt, sizeof(sbv_ota_header_pkt_t));
     if(pkt_crc != new_crc)
     {
         /* LOG */
@@ -322,7 +322,7 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
 
     pkt_crc         = data_pkt->h.crc;
     data_pkt->h.crc = 0;
-    new_crc         = sbv_ota_calculate_crc((uint8_t *)data_pkt, pkt_length);
+    new_crc         = sbv_ota_frame_crc((uint8_t *)data_pkt, pkt_length);
     if(pkt_crc != new_crc)
     {
         /* LOG */
@@ -365,7 +365,7 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
 
     pkt_crc         = resp_pkt->h.crc;
     resp_pkt->h.crc = 0;
-    new_crc         = sbv_ota_calculate_crc((uint8_t *)resp_pkt, sizeof(sbv_ota_resp_pkt_t));
+    new_crc         = sbv_ota_frame_crc((uint8_t *)resp_pkt, sizeof(sbv_ota_resp_pkt_t));
     if(pkt_crc != new_crc)
     {
         /* LOG */
@@ -410,7 +410,7 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
 
     pkt_crc            = report_pkt->h.crc;
     report_pkt->h.crc  = 0;
-    new_crc            = sbv_ota_calculate_crc((uint8_t *)report_pkt, sizeof(sbv_ota_report_pkt_t));
+    new_crc            = sbv_ota_frame_crc((uint8_t *)report_pkt, sizeof(sbv_ota_report_pkt_t));
     if(pkt_crc != new_crc)
     {
         /* LOG */

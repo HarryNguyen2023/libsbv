@@ -15,8 +15,6 @@ extern CRC_HandleTypeDef hcrc;
 #endif /*STM32F1xx*/
 #endif /* SBV_HW_CRC */
 
-volatile sbv_ota_general_cfg *sbv_ota_cfg_flash = (sbv_ota_general_cfg *)(((volatile uint32_t *)(SBV_OTA_CONFIG_FLASH_ADD)));
-
 int
 sbv_ota_erase_flash_data (uint32_t page_addr, uint16_t pages_num)
 {
@@ -43,8 +41,76 @@ sbv_ota_write_flash_data (uint8_t *data, uint32_t data_length, uint32_t page_add
     return SBV_OK;
 }
 
+void
+sbv_ota_cfg_read (sbv_ota_general_cfg_t *c) {
+    if (! c) {
+        // LOG
+        return;
+    }
+    memset (c, 0, sizeof (sbv_ota_general_cfg_t));
+    memcpy (c, (const void *)((volatile uint32_t *)SBV_OTA_CONFIG_FLASH_ADD), sizeof (sbv_ota_general_cfg_t));
+}
+
+int
+sbv_cfg_validate (const sbv_ota_general_cfg_t *c) {
+    uint32_t metadata_crc, new_crc;
+
+    if (c->magic != SBV_OTA_CONFIG_FLASH_ADD) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    metadata_crc = c->crc;
+    new_crc      = sbv_ota_calculate_crc ((uint8_t *)c, offsetof(sbv_ota_general_cfg_t, crc));
+
+    return (new_crc == metadata_crc) ? SBV_OK : SBV_ERROR;
+}
+
+int
+sbv_ota_cfg_read_and_validate (sbv_ota_general_cfg_t *c) {
+    if (! c) {
+        // LOG
+        return -1;
+    }
+
+    sbv_ota_cfg_read (c);
+
+    return sbv_cfg_validate (c);
+}
+
+int
+sbv_ota_cfg_commit(sbv_ota_general_cfg_t *c) {
+    int ret;
+    uint32_t metadata_crc;
+
+    if (! c) {
+        // LOG
+        return;
+    }
+
+    c->magic = SBV_OTA_CONFIG_FLASH_ADD;
+    metadata_crc = sbv_ota_calculate_crc ((uint8_t *)c, offsetof(sbv_ota_general_cfg_t, crc));
+    c->crc   = metadata_crc;
+
+    ret = sbv_ota_erase_flash_data (SBV_OTA_CONFIG_FLASH_ADD, SBV_OTA_GEN_CFG_PAGES);
+    if (ret != SBV_OK)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    ret = sbv_ota_write_flash_data((uint8_t *)c, sizeof(sbv_ota_general_cfg_t), SBV_OTA_CONFIG_FLASH_ADD);
+    if (ret != SBV_OK)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    return SBV_OK;
+}
+
 uint8_t
-sbv_ota_get_update_slot (sbv_ota_general_cfg* cfg)
+sbv_ota_get_update_slot (sbv_ota_general_cfg_t* cfg)
 {
     uint8_t data_slot = SBV_OTA_INVALID_SLOT;
 
@@ -62,7 +128,7 @@ sbv_ota_get_update_slot (sbv_ota_general_cfg* cfg)
 }
 
 uint8_t
-sbv_ota_get_active_slot (sbv_ota_general_cfg* cfg)
+sbv_ota_get_active_slot (sbv_ota_general_cfg_t* cfg)
 {
     uint8_t data_slot = SBV_OTA_INVALID_SLOT;
 
@@ -87,12 +153,16 @@ sbv_ota_get_active_slot (sbv_ota_general_cfg* cfg)
 uint8_t
 sbv_ota_get_available_slot_num (void)
 {
+    int ret;
 	uint8_t data_slot = SBV_OTA_INVALID_SLOT;
-	sbv_ota_general_cfg cfg;
+	sbv_ota_general_cfg_t cfg;
 
     /* Read the configuration in flash memory space */
-    memset(&cfg, 0, sizeof(sbv_ota_general_cfg));
-	memcpy(&cfg, sbv_ota_cfg_flash, sizeof(sbv_ota_general_cfg));
+    ret = sbv_ota_cfg_read_and_validate (&cfg);
+    if (ret != SBV_OK) {
+        // LOG
+        return SBV_OTA_INVALID_SLOT;
+    }
 
 	/* Looking for the valid slot */
 	for(uint8_t i = 0; i < SBV_OTA_SLOT_NO; ++i)
@@ -115,15 +185,18 @@ sbv_ota_get_available_slot_num (void)
 int
 sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
 {
-    int i, found = SBV_FALSE;
-	sbv_ota_general_cfg cfg;
+    int i, found = SBV_FALSE, ret;
+	sbv_ota_general_cfg_t cfg;
 
     if (! current_fw_medata)
         return -1;
 
     /* Read the configuration in flash memory space */
-    memset(&cfg, 0, sizeof(sbv_ota_general_cfg));
-	memcpy(&cfg, sbv_ota_cfg_flash, sizeof(sbv_ota_general_cfg));
+    ret = sbv_ota_cfg_read_and_validate (&cfg);
+    if (ret != SBV_OK) {
+        // LOG
+        return -1;
+    }
 
     for (i = 0; i < SBV_OTA_SLOT_NO; ++i)
     {
@@ -148,7 +221,7 @@ sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
  * @retval uint32_t
  */
 uint32_t
-sbv_ota_calculate_crc (uint8_t *buffer, uint32_t buffer_length)
+sbv_ota_calculate_crc (const uint8_t *buffer, const uint32_t buffer_length)
 {
 #ifdef SBV_HW_CRC
 #ifdef STM32F1xx
@@ -177,38 +250,45 @@ sbv_ota_calculate_crc (uint8_t *buffer, uint32_t buffer_length)
 #endif /*SBV_HW_CRC*/
 }
 
-/*
- * @brief: Calculate the CRC for the firmware image metadata on the fielsystem for validity check
- *          1st, Calculate the CRC of the firmware storage register address
- *          2nd, Calcualte the CRC of the combination of fw version, fw timestampt, and the 1st CRC
- * @param page_addr: firmware storage register address
- * @param fw_metadata: input fw metadata
- * @retval uint32_t
- */
-static uint32_t
-sbv_ota_fw_crc_cal (const uint32_t page_addr, const sbv_ota_fw_metadata_t fw_metadata)
-{
-    uint8_t fw_img_data[36] = {0};
-    uint32_t fw_img_crc;
-
-    /* Create the first Hash layer */
-    fw_img_crc = sbv_ota_calculate_crc((uint8_t *)&page_addr, fw_metadata.fw_size);
-
-    memcpy (fw_img_data, fw_metadata.fw_version, 12);
-    memcpy (fw_img_data + 12, fw_metadata.fw_timestamp, 20);
-    memcpy (fw_img_data + 32, &fw_img_crc, sizeof(uint32_t));
-
-    /* Create the Second Hash layer */
-    fw_img_crc = sbv_ota_calculate_crc (fw_img_data, 36);
-    return fw_img_crc;
+uint32_t
+sbv_ota_frame_crc (uint8_t *pkt, uint32_t pkt_length) {
+    return sbv_ota_calculate_crc (pkt, pkt_length);
 }
 
+uint32_t
+sbv_ota_img_crc (const uint8_t *img, uint32_t img_size) {
+    if (! img || img_size == 0 || img_size > SBV_OTA_SLOT_MAX_SIZE) {
+        // LOG
+        return 0;
+    }
+    return sbv_ota_calculate_crc (img, img_size);
+}
+
+/*
+ * @brief: Calculate the CRC for the firmware image on the flash for validity check
+ * @param page_addr: firmware storage register address
+ * @param fw_metadata: input fw metadata
+ * @retval int
+ */
 int
 sbv_ota_fw_image_crc_validate (const uint32_t page_addr, const sbv_ota_fw_metadata_t fw_metadata)
 {
     uint32_t fw_img_crc;
+    const uint8_t *img;
 
-    fw_img_crc = sbv_ota_fw_crc_cal (page_addr, fw_metadata);
+    if (! sbv_ota_is_valid_page_addr(page_addr)) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    if (fw_metadata.fw_size == 0 || fw_metadata.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    img = (const uint8_t *)page_addr;
+    fw_img_crc = sbv_ota_img_crc((uint8_t *)img, fw_metadata.fw_size);
+
     return (fw_img_crc == fw_metadata.fw_crc) ? SBV_TRUE : SBV_FALSE;
 }
 

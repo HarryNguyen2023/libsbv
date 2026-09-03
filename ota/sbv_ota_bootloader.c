@@ -7,8 +7,6 @@
 #include "sbv_ota_common.h"
 #include "sbv_ota_bootloader.h"
 
-extern volatile sbv_ota_general_cfg *sbv_ota_cfg_flash;
-
 /*
  * @brief: Get the available data slot for firmware update
  * @param none
@@ -21,10 +19,14 @@ sbv_ota_get_available_fw_update_slot (void)
 	uint8_t data_slot = SBV_OTA_INVALID_SLOT;
     uint8_t is_image_valid = SBV_FALSE, is_update_cfg = SBV_FALSE;
     uint32_t slot_page_addr;
-    sbv_ota_general_cfg cfg;
+    sbv_ota_general_cfg_t cfg;
 
 	/* Read the configuration in flash memory space */
-	memcpy(&cfg, sbv_ota_cfg_flash, sizeof(sbv_ota_general_cfg));
+	ret = sbv_ota_cfg_read_and_validate (&cfg);
+    if (ret != SBV_OK) {
+        // LOG
+        return SBV_OTA_INVALID_SLOT;
+    }
 
 	/* Looking for the new update slot and boot it up */
     if (cfg.reboot_reason == SBV_OTA_NEW_UPDATE_BOOT)
@@ -100,14 +102,7 @@ FALL_BACK:
 
     if (is_update_cfg)
     {
-        ret = sbv_ota_erase_flash_data (SBV_OTA_CONFIG_FLASH_ADD, SBV_OTA_GEN_CFG_PAGES);
-        if (ret != SBV_OK)
-        {
-            /* LOG */
-            return SBV_OTA_INVALID_SLOT;
-        }
-
-        ret = sbv_ota_write_flash_data((uint8_t *)&cfg, sizeof(sbv_ota_general_cfg), SBV_OTA_CONFIG_FLASH_ADD);
+        ret = sbv_ota_cfg_commit (&cfg);
         if (ret != SBV_OK)
         {
             /* LOG */

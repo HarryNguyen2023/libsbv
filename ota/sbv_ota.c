@@ -5,8 +5,8 @@
 #include "sbv_rtos.h"
 #include "sbv_gpio.h"
 #include "sbv_cqbuff.h"
-#include "sbv_ota.h"
 #include "sbv_ota_common.h"
+#include "sbv_ota.h"
 #include "sbv_ota_msg.h"
 
 #define SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS (5 * 1000)
@@ -19,8 +19,6 @@ sbv_rtos_task_handle_t sbv_ota_update_fw_handle;
 static sbv_rtos_stack_type_t sbv_ota_fw_update_stack[STACK_SIZE_BASE * 4];
 
 void sbv_ota_update_fw_thread (void *param);
-
-extern volatile sbv_ota_general_cfg *sbv_ota_cfg_flash;
 
 sbv_rtos_queue_handle_t sbv_ota_installer_rx_queue;
 extern sbv_rtos_queue_handle_t sbv_ota_slave_rx_installer_tx_queue;
@@ -121,7 +119,7 @@ static int
 sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metadata, int is_image_valid)
 {
     int ret;
-	sbv_ota_general_cfg cfg;
+	sbv_ota_general_cfg_t cfg;
 
     if (! sbv_ota_is_valid_fw_slot (image_slot) || slot_metadata == NULL)
     {
@@ -130,8 +128,12 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
     }
 
     /* Read the configuration in flash memory space */
-    memset(&cfg, 0, sizeof(sbv_ota_general_cfg));
-	memcpy(&cfg, sbv_ota_cfg_flash, sizeof(sbv_ota_general_cfg));
+    ret = sbv_ota_cfg_read_and_validate (&cfg);
+    if (ret != SBV_OK) {
+        // LOG
+        return -1;
+    }
+
     if (is_image_valid)
     {
         cfg.reboot_reason                         = SBV_OTA_NEW_UPDATE_BOOT;
@@ -149,14 +151,7 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
         memcpy (&(cfg.slot_table[image_slot].metadata), slot_metadata, sizeof (sbv_ota_fw_metadata_t));
     }
 
-    ret = sbv_ota_erase_flash_data (SBV_OTA_CONFIG_FLASH_ADD, SBV_OTA_GEN_CFG_PAGES);
-    if (ret != SBV_OK)
-    {
-        /* LOG */
-        return -1;
-    }
-
-    ret = sbv_ota_write_flash_data((uint8_t *)&cfg, sizeof(sbv_ota_general_cfg), SBV_OTA_CONFIG_FLASH_ADD);
+    ret = sbv_ota_cfg_commit (&cfg);
     if (ret != SBV_OK)
     {
         /* LOG */
