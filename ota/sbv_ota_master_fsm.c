@@ -311,7 +311,7 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
     //
     //
 
-    while (image_length >= 0)
+    while (image_length > 0)
     {
         chunk_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? SBV_OTA_DATA_MAX_SIZE : image_length;
         image_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? (image_length - SBV_OTA_DATA_MAX_SIZE) : 0;

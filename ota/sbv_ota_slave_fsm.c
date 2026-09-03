@@ -452,7 +452,7 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
     sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-    if (ret < 0) {
+    if (ret != SBV_OK) {
         /* LOG */
     }
 
@@ -480,26 +480,24 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
         return;
     }
 
-    ret1 = sbv_ota_slave_fsm_handle_data (&sbv_ota_msg_slave_handler, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-    if (ret1 != SBV_BUSY && ret1 != SBV_OK) {
-        // LOG
-    }
+    do {
+        ret1 = sbv_ota_slave_fsm_handle_data (&sbv_ota_msg_slave_handler, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+        if (ret1 != SBV_BUSY && ret1 != SBV_OK) {
+            // LOG
+        }
 
-    resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
+        resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_RESP_PACKET_LEN : 0);
+        sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
-    ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-    if (ret2 != SBV_OK)
-    {
-        /* LOG */
-    }
+        ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+        if (ret2 != SBV_OK)
+        {
+            /* LOG */
+        }
 
-    // Not yet receive all the firmware image, stay at the current DATA state
-    if (ret1 == SBV_BUSY) {
-        // LOG
-        return;
-    }
+        // Not yet receive all the firmware image, stay at the current DATA state
+    } while (ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP);
 
     sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE (SBV_OTA_STATE_END, ret2, resp_type);
 
