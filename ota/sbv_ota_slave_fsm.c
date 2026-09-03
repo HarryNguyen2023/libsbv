@@ -350,7 +350,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
         return SBV_ERROR;
     }
 
-    total_pkt_len = data_pkt->h.length + sizeof(sbv_ota_data_pkt_t);
+    total_pkt_len = common_header.length + sizeof(sbv_ota_data_pkt_t);
     data_pkt = sbv_rtos_malloc(total_pkt_len);
     if (! data_pkt) {
         // LOG
@@ -377,7 +377,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
 
     sbv_rtos_free (data_pkt);
 
-    slave_handler->current_rcv_image_size += rcv_data_size;
+    slave_handler->current_rcv_image_size += common_header.length;
 
     if (slave_handler->current_rcv_image_size >= slave_handler->new_fw_metadata.fw_size) {
         // LOG
