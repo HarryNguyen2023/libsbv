@@ -243,6 +243,7 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
         expected_seq_num = *seq_num + SBV_OTA_CMD_PACKET_LEN;
         ret = sbv_ota_seq_num_validate (cmd_pkt->h.seq_num, expected_seq_num);
         if (ret != SBV_OK) {
+            // LOG
             return ret;
         }
 
@@ -303,6 +304,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     expected_seq_num = *seq_num + SBV_OTA_HEADER_PACKET_LEN;
     ret = sbv_ota_seq_num_validate (head_pkt->h.seq_num, expected_seq_num);
     if (ret != SBV_OK) {
+        // LOG
         return ret;
     }
 
@@ -355,8 +357,11 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
     expected_seq_num = *seq_num + data_pkt->h.length;
     ret = sbv_ota_seq_num_validate (data_pkt->h.seq_num, expected_seq_num);
     if (ret != SBV_OK) {
+        // LOG
         return ret;
     }
+
+    *seq_num = expected_seq_num;
 
     return 0;
 
@@ -404,6 +409,7 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
     expected_seq_num = *seq_num + SBV_OTA_RESP_PACKET_LEN;
     ret = sbv_ota_seq_num_validate (resp_pkt->h.seq_num, expected_seq_num);
     if (ret != SBV_OK) {
+        // LOG
         return ret;
     }
 
@@ -455,6 +461,7 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
     expected_seq_num = *seq_num + SBV_OTA_REP_PACKET_LEN;
     ret = sbv_ota_seq_num_validate (report_pkt->h.seq_num, expected_seq_num);
     if (ret != SBV_OK) {
+        // LOG
         return ret;
     }
 
