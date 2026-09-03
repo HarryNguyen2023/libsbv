@@ -334,6 +334,10 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
             ret = sbv_ota_master_fsm_handle_resp (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
             if (ret != SBV_OK)
             {
+                if (ret == SVB_OTA_SEQ_DUP) {
+                    // LOG
+                    break;
+                }
                 /* LOG */
                 retry_time++;
                 continue;
@@ -383,6 +387,10 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_master_fsm_handle_report (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_END_MSG_TIMEOUT_MS);
         if (ret != SBV_OK)
         {
+            if (ret == SVB_OTA_SEQ_DUP) {
+                // LOG
+                break;
+            }
             /* LOG */
             retry_time++;
             continue;

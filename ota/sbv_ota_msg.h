@@ -44,7 +44,7 @@ typedef struct sbv_ota_pkt_common_header_t {
 #define SBV_OTA_CMD_PACKET_LEN    (1)
 #define SBV_OTA_HEADER_PACKET_LEN (sizeof(sbv_ota_fw_metadata_t))
 #define SBV_OTA_RESP_PACKET_LEN   (1)
-#define SBV_OTA_REP_PACKET_LEN    (sizeof (sbv_ota_report_pkt_t) - sizeof(sbv_ota_pkt_common_header_t))
+#define SBV_OTA_REP_PACKET_LEN    (1 + sizeof(sbv_ota_fw_metadata_t))
   uint16_t  seq_num;
   uint32_t  crc;
 } __attribute__((packed)) sbv_ota_pkt_common_header_t;
@@ -121,7 +121,7 @@ typedef struct sbv_ota_resp_pkt_t
 typedef struct sbv_ota_report_pkt_t
 {
   sbv_ota_pkt_common_header_t h;
-  sbv_ota_upd_status          status;
+  uint8_t                     status;
   sbv_ota_fw_metadata_t       upd_fw_metadata;
 } __attribute__((packed)) sbv_ota_report_pkt_t;
 

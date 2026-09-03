@@ -339,7 +339,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
         return ret;
     }
 
-    ret = sbv_ota_packet_header_validate (&(data_pkt->h), SBV_OTA_PACKET_TYPE_DATA);
+    ret = sbv_ota_packet_header_validate (&(common_header), SBV_OTA_PACKET_TYPE_DATA);
     if (ret != SBV_OK) {
         // LOG
         return ret;
