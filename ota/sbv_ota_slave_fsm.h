@@ -24,6 +24,6 @@ typedef struct sbv_ota_msg_slave_handler_t
 } sbv_ota_msg_slave_handler_t;
 
 void
-sbv_ota_slave_fsm_init (void);
+sbv_ota_slave_fsm_init (void* param);
 
 #endif /* SBV_OTA_SLAVE_FSM_T */

@@ -43,6 +43,8 @@ sbv_uart_instance_t          sbv_uart_1;
 extern sbv_can_handle_t     hcan;
 sbv_can_instance_t          sbv_can_instance;
 
+sbv_ota_ipc_t   sbv_ota_queues;
+
 void sbv_led_init_blink (void);
 void sbv_task_init(void);
 void sbv_task_balance_control(void *param);
@@ -66,8 +68,7 @@ sbv_init(void)
     /* Blink LED and wait for hardware system to stablize before starting software tasks */
     sbv_led_init_blink();
 
-    sbv_ota_update_init();
-    sbv_ota_slave_fsm_init ();
+    sbv_task_ota_init (SBV_FALSE);
 
     sbv_task_init();
 }
@@ -158,5 +159,17 @@ sbv_task_debug_console_task(void *param)
         // Send logging data over UART to console for debugging
         sbv_debug_tx_logging ();
         start_tick = sbv_rtos_get_tick();
+    }
+}
+
+void
+sbv_task_ota_init (uint8_t is_master) {
+    sbv_ota_ipc_queue_init (&sbv_ota_queues);
+
+    sbv_ota_update_init (&sbv_ota_queues);
+    sbv_ota_slave_fsm_init (&sbv_ota_queues);
+
+    if (is_master) {
+        sbv_ota_master_fsm_init ();
     }
 }

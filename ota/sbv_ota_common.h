@@ -79,10 +79,9 @@ typedef enum sbv_ota_state_t
 
 typedef enum sbv_ota_system_msg_event_t
 {
-  SBV_OTA_EVENT_START,
-  SBV_OTA_EVENT_METADATA,
-  SBV_OTA_EVENT_IMG,
-  SBV_OTA_EVENT_STOP,
+  SBV_OTA_EVENT_UDP_START,
+  SBV_OTA_EVENT_IMG_WRITE,
+  SBV_OTA_EVENT_UDP_FINALIZE,
   SBV_OTA_EVENT_ACK,
   SBV_OTA_EVENT_ABORT
 } sbv_ota_system_msg_event_t;
@@ -92,6 +91,11 @@ typedef struct sbv_ota_system_msg_t
   sbv_ota_system_msg_event_t event;
   void*                      data;
 } sbv_ota_system_msg_t;
+
+typedef struct sbv_ota_ipc_t {
+  sbv_rtos_queue_handle_t to_installer;
+  sbv_rtos_queue_handle_t to_slave_fsm;
+} sbv_ota_ipc_t;
 
 int
 sbv_ota_erase_flash_data (uint32_t page_addr, uint16_t pages_num);

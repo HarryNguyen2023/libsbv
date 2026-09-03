@@ -27,6 +27,7 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data);
 void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data);
 void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data);
 
+void sbv_ota_master_fsm_handle_state (void *data);
 void sbv_task_ota_update_fw_master (void* param);
 int sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms);
 int sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms);

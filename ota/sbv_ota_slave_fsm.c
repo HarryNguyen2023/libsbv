@@ -9,7 +9,6 @@
 #include "sbv_ota_fsm_common.h"
 #include "sbv_ota_slave_fsm.h"
 
-
 #define SBV_OTA_SLAVE_AND_INSTALLER_QUEUE_LEN    1
 #define SBV_OTA_SLAVE_FSM_PRIORITY               2
 
@@ -31,7 +30,6 @@ void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data);
 void sbv_ota_slave_fsm_handle_state (void *data);
 
 int sbv_ota_slave_fsm_start_fw_update (void);
-int sbv_ota_slave_fsm_send_fw_metadata_to_installelr (void);
 int sbv_ota_slave_fsm_send_img_to_installer (void);
 int sbv_ota_slave_fsm_stop_fw_update (void);
 
@@ -78,13 +76,10 @@ struct sbv_ota_fsm_cb_t sbv_ota_slave_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STATE
      {SBV_OTA_STATE_END,    sbv_ota_slave_fsm_idle}},
 };
 
-typedef struct sbv_ota_slave_fw_installer_task_t {
-    int (*function_task) (void);
-} sbv_ota_slave_fw_installer_task_t;
+typedef int (*sbv_ota_slave_fw_installer_func_t)(void);
 
-sbv_ota_slave_fw_installer_task_t sbv_ota_slave_fw_installer_tasks[4] = {
+sbv_ota_slave_fw_installer_func_t sbv_ota_slave_fw_installer_tasks[3] = {
     sbv_ota_slave_fsm_start_fw_update,
-    sbv_ota_slave_fsm_send_fw_metadata_to_installelr,
     sbv_ota_slave_fsm_send_img_to_installer,
     sbv_ota_slave_fsm_stop_fw_update
 };
@@ -93,8 +88,8 @@ int
 sbv_ota_slave_fsm_fw_installer_tasks_process (void) {
     int ret;
 
-    for (uint8_t i = 0; i < 4; ++i) {
-        ret = (sbv_ota_slave_fw_installer_tasks[i].function_task)();
+    for (uint8_t i = 0; i < 3; ++i) {
+        ret = (sbv_ota_slave_fw_installer_tasks[i])();
         if (ret != SBV_OK) {
             // LOG
             return ret;
@@ -107,8 +102,10 @@ sbv_ota_slave_fsm_fw_installer_tasks_process (void) {
 }
 
 void
-sbv_ota_slave_fsm_init (void)
+sbv_ota_slave_fsm_init (void* param)
 {
+    sbv_ota_ipc_t *ipc;
+
     memset(&sbv_ota_msg_slave_handler, 0, sizeof (sbv_ota_msg_slave_handler_t));
 
     sbv_ota_msg_slave_handler.state             = SBV_OTA_STATE_IDLE;
@@ -118,10 +115,14 @@ sbv_ota_slave_fsm_init (void)
 
     sbv_ota_msg_slave_handler.data_queue = sbv_cqbuff_create (SBV_OTA_SLAVE_RCV_BUFFER_SIZE, 1);
 
-    sbv_ota_slave_rx_installer_tx_queue = sbv_rtos_create_queue(SBV_OTA_SLAVE_AND_INSTALLER_QUEUE_LEN,
-                                                                sizeof (sbv_ota_system_msg_t));
-    sbv_ota_msg_slave_handler.slave_rx_installer_tx_queue   = sbv_ota_slave_rx_installer_tx_queue;
-    sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue   = sbv_ota_installer_rx_queue;
+    ipc = (sbv_ota_ipc_t *)param;
+    if (! ipc) {
+        // LOG
+        return;
+    }
+
+    sbv_ota_msg_slave_handler.slave_rx_installer_tx_queue   = ipc->to_slave_fsm;
+    sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue   = ipc->to_installer;
 
     sbv_rtos_mutex_create (sbv_ota_msg_slave_handler.mu);
 
@@ -506,23 +507,18 @@ SEND_REPORT:
 }
 
 int
-sbv_ota_send_system_msg_start (sbv_rtos_queue_handle_t queue, uint16_t timeout_ms) {
-    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_START, NULL, timeout_ms);
+sbv_ota_send_system_msg_udp_start (sbv_rtos_queue_handle_t queue, void* img_metadata, uint16_t timeout_ms) {
+    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_UDP_START, img_metadata, timeout_ms);
 }
 
 int
-sbv_ota_send_system_msg_metadata (sbv_rtos_queue_handle_t queue, void* img_metadata, uint16_t timeout_ms) {
-    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_METADATA, img_metadata, timeout_ms);
+sbv_ota_send_system_msg_image_write (sbv_rtos_queue_handle_t queue, void* img, uint16_t timeout_ms) {
+    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_IMG_WRITE, img, timeout_ms);
 }
 
 int
-sbv_ota_send_system_msg_image (sbv_rtos_queue_handle_t queue, void* img, uint16_t timeout_ms) {
-    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_IMG, img, timeout_ms);
-}
-
-int
-sbv_ota_send_system_msg_stop (sbv_rtos_queue_handle_t queue, uint16_t timeout_ms) {
-    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_STOP, NULL, timeout_ms);
+sbv_ota_send_system_msg_udp_finalize (sbv_rtos_queue_handle_t queue, uint16_t timeout_ms) {
+    return sbv_ota_send_system_msg (queue, SBV_OTA_EVENT_UDP_FINALIZE, NULL, timeout_ms);
 }
 
 int
@@ -575,26 +571,7 @@ int
 sbv_ota_slave_fsm_start_fw_update (void) {
     int ret;
 
-    ret = sbv_ota_send_system_msg_start (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue, SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
-    if (ret != SBV_OK) {
-        // LOG
-        return ret;
-    }
-
-    ret = sbv_ota_slave_fsm_system_msg_handle ();
-    if (ret != SBV_OK) {
-        // LOG
-        return ret;
-    }
-
-    return SBV_OK;
-}
-
-int
-sbv_ota_slave_fsm_send_fw_metadata_to_installelr (void) {
-    int ret;
-
-    ret = sbv_ota_send_system_msg_metadata (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
+    ret = sbv_ota_send_system_msg_udp_start (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
                                             &(sbv_ota_msg_slave_handler.new_fw_metadata),
                                             SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
@@ -615,9 +592,9 @@ int
 sbv_ota_slave_fsm_send_img_to_installer (void) {
     int ret;
 
-    ret = sbv_ota_send_system_msg_image (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
-                                         sbv_ota_msg_slave_handler.fw_image,
-                                         SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
+    ret = sbv_ota_send_system_msg_image_write (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
+                                               sbv_ota_msg_slave_handler.fw_image,
+                                               SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -636,7 +613,8 @@ int
 sbv_ota_slave_fsm_stop_fw_update (void) {
     int ret;
 
-    ret = sbv_ota_send_system_msg_stop (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue, SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
+    ret = sbv_ota_send_system_msg_udp_finalize (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
+                                                SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
         return ret;
