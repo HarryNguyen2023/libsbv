@@ -229,7 +229,21 @@ sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeo
 
     ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &cmd_pkt,
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
-                                    sizeof(sbv_ota_cmd_pkt_t), timeout_ms);
+                                    sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_packet_header_validate (&(cmd_pkt.h), SBV_OTA_PACKET_TYPE_CMD);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &(cmd_pkt.cmd),
+                                    rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
+                                    cmd_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -258,11 +272,24 @@ sbv_ota_slave_fsm_handle_header(void *param, uint32_t timeout_ms)
         // LOG
         return -1;
     }
-
     
     ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &header_pkt,
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
-                                    sizeof(sbv_ota_header_pkt_t), timeout_ms);
+                                    sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_packet_header_validate (&(header_pkt.h), SBV_OTA_PACKET_TYPE_HEADER);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &(header_pkt.data_info),
+                                    rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
+                                    header_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -290,7 +317,8 @@ int
 sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
 {
     int ret;
-    uint32_t rcv_size, rcv_data_size;
+    uint32_t total_pkt_len, rcv_data_size;
+    sbv_ota_pkt_common_header_t common_header;
     sbv_ota_data_pkt_t *data_pkt;
     sbv_ota_msg_slave_handler_t *slave_handler;
 
@@ -302,23 +330,44 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
 
     rcv_data_size   = (slave_handler->new_fw_metadata.fw_size - slave_handler->current_rcv_image_size);
     rcv_data_size   = (rcv_data_size > SBV_OTA_DATA_MAX_SIZE) ? SBV_OTA_DATA_MAX_SIZE : rcv_data_size;
-    rcv_size        = rcv_data_size + sizeof(sbv_ota_data_pkt_t);
 
-    data_pkt = sbv_rtos_malloc(rcv_size);
-    if (! data_pkt) {
+    ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &common_header,
+                                    rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
+                                    sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
+    if (ret != SBV_OK) {
         // LOG
-        return -1;
+        return ret;
     }
 
-    ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, data_pkt,
+    ret = sbv_ota_packet_header_validate (&(data_pkt->h), SBV_OTA_PACKET_TYPE_DATA);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    if (data_pkt->h.length > rcv_data_size) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    total_pkt_len = data_pkt->h.length + sizeof(sbv_ota_data_pkt_t);
+    data_pkt = sbv_rtos_malloc(total_pkt_len);
+    if (! data_pkt) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    memcpy (&(data_pkt->h), &common_header, sizeof (sbv_ota_pkt_common_header_t));
+
+    ret = sbv_ota_msg_get_rcv_data (NULL, slave_handler->data_queue, &(data_pkt->data),
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
-                                    rcv_size, timeout_ms);
+                                    data_pkt->h.length, timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         goto ERR_EXIT;
     }
 
-    ret = sbv_ota_msg_rx_data_packet_validate (data_pkt, rcv_size, &(slave_handler->peer_seq_num));
+    ret = sbv_ota_msg_rx_data_packet_validate (data_pkt, total_pkt_len, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
         goto ERR_EXIT;
@@ -339,7 +388,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
 
 ERR_EXIT:
     sbv_rtos_free (data_pkt);
-    return SBV_ERROR;
+    return ret;
 }
 
 
@@ -367,9 +416,9 @@ void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
 
     sbv_ota_msg_slave_handler.is_updating = SBV_TRUE;
 
-    resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
+    resp_type = (ret == SBV_OK || ret == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_RESP_PACKET_LEN;
+    sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
@@ -398,9 +447,9 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
         /* LOG */
     }
 
-    resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
+    resp_type = (ret == SBV_OK || ret == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_RESP_PACKET_LEN;
+    sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret < 0) {
@@ -436,9 +485,9 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
         // LOG
     }
 
-    resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_ACK : SBV_OTA_NACK;
+    resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_RESP_PACKET_LEN;
+    sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
     ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret2 != SBV_OK)
@@ -488,9 +537,9 @@ void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
     }
 
 SEND_REPORT:
-    upd_status = (ret == SBV_OK) ? SBV_OTA_UPD_SUCCESS : SBV_OTA_UDP_FAILED;
+    upd_status = (ret == SBV_OK || ret == SVB_OTA_SEQ_DUP) ? SBV_OTA_UPD_SUCCESS : SBV_OTA_UDP_FAILED;
 
-    sbv_ota_msg_slave_handler.seq_num += SBV_OTA_REP_PACKET_LEN;
+    sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_REP_PACKET_LEN : 0);
 
     ret = sbv_ota_msg_send_report (upd_status, sbv_ota_msg_slave_handler.seq_num,
                                    &(sbv_ota_msg_slave_handler.new_fw_metadata),

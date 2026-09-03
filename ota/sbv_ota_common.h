@@ -34,6 +34,8 @@
 #define SBV_OTA_FW_VERSION_LENGTH   12
 #define SBV_OTA_FW_TIME_LENGTH      20
 
+#define SVB_OTA_SEQ_DUP             (-3)
+
 typedef struct sbv_ota_fw_metadata_t
 {
   uint32_t  fw_size;
@@ -130,5 +132,5 @@ sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event
 uint16_t
 sbv_ota_get_random_seq_number (void);
 int
-sbv_ota_seq_num_validate (uint16_t seq_num, uint16_t expected_seq_num);
+sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t seq_num_offset);
 #endif /* SBV_OTA_COMMON_H */

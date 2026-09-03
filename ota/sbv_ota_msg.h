@@ -5,12 +5,11 @@
 #include "sbv.h"
 
 #define SBV_OTA_SOF 	0xAA	/* Start of frame */
-#define SBV_OTA_EOF 	0xBB	/* End of frame */
 #define SBV_OTA_ACK 	0x00	/* ACK */
 #define SBV_OTA_NACK	0x01	/* NACK */
 
 #define SBV_OTA_DATA_MAX_SIZE     (1024)
-#define SBV_OTA_DATA_OVERHEAD     (6)
+#define SBV_OTA_DATA_OVERHEAD     (10)
 #define SBV_OTA_PACKET_MAX_SIZE   (SBV_OTA_DATA_MAX_SIZE + SBV_OTA_DATA_OVERHEAD)
 
 /* SBV OTA Packet type */
@@ -45,7 +44,7 @@ typedef struct sbv_ota_pkt_common_header_t {
 #define SBV_OTA_CMD_PACKET_LEN    (1)
 #define SBV_OTA_HEADER_PACKET_LEN (sizeof(sbv_ota_fw_metadata_t))
 #define SBV_OTA_RESP_PACKET_LEN   (1)
-#define SBV_OTA_REP_PACKET_LEN    (1 + sizeof(sbv_ota_fw_metadata_t))
+#define SBV_OTA_REP_PACKET_LEN    (sizeof (sbv_ota_report_pkt_t) - sizeof(sbv_ota_pkt_common_header_t))
   uint16_t  seq_num;
   uint32_t  crc;
 } __attribute__((packed)) sbv_ota_pkt_common_header_t;
@@ -145,6 +144,8 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info, ui
 int 
 sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_num, uint16_t timeout_ms);
 
+int
+sbv_ota_packet_header_validate (sbv_ota_pkt_common_header_t *header, uint8_t packet_type);
 int
 sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq_num);
 int

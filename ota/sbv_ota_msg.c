@@ -201,31 +201,62 @@ ERR:
 }
 
 int
+sbv_ota_packet_header_validate (sbv_ota_pkt_common_header_t *header, uint8_t packet_type) {
+    uint16_t pkt_default_length;
+
+    if (! header) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    if(header->sof != SBV_OTA_SOF)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    if(header->packet_type != packet_type)
+    {
+        /* LOG */
+        return SBV_ERROR;
+    }
+
+    if (header->length == 0 || header->length > SBV_OTA_DATA_MAX_SIZE) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    switch (packet_type)
+    {
+    case SBV_OTA_PACKET_TYPE_CMD:
+        pkt_default_length = SBV_OTA_CMD_PACKET_LEN;
+        break;
+    case SBV_OTA_PACKET_TYPE_HEADER:
+        pkt_default_length = SBV_OTA_HEADER_PACKET_LEN;
+        break;
+    case SBV_OTA_PACKET_TYPE_RESPONSE:
+        pkt_default_length = SBV_OTA_RESP_PACKET_LEN;
+        break;
+    case SBV_OTA_PACKET_TYPE_REPORT:
+        pkt_default_length = SBV_OTA_REP_PACKET_LEN;
+        break;
+    
+    default:
+        pkt_default_length = 0;
+        break;
+    }
+
+    return (pkt_default_length && pkt_default_length != header->length) ? SBV_ERROR : SBV_OK;
+}
+
+int
 sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cmd_type, uint16_t* seq_num)
 {
     int ret;
-    uint16_t expected_seq_num;
     uint32_t pkt_crc, new_crc;
 
     if (! cmd_pkt)
         return -1;
-
-    if(cmd_pkt->h.sof != SBV_OTA_SOF)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(cmd_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_CMD)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if (cmd_pkt->h.length != SBV_OTA_CMD_PACKET_LEN) {
-        // LOG
-        goto ERR_EXIT;
-    }
 
     pkt_crc         = cmd_pkt->h.crc;
     cmd_pkt->h.crc  = 0;
@@ -240,17 +271,14 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
         // LOG
         *seq_num = cmd_pkt->h.seq_num;
     } else {
-        expected_seq_num = *seq_num + SBV_OTA_CMD_PACKET_LEN;
-        ret = sbv_ota_seq_num_validate (cmd_pkt->h.seq_num, expected_seq_num);
+        ret = sbv_ota_seq_num_validate (seq_num, cmd_pkt->h.seq_num, SBV_OTA_CMD_PACKET_LEN);
         if (ret != SBV_OK) {
             // LOG
             return ret;
         }
-
-        *seq_num = expected_seq_num;
     }
 
-    return (cmd_pkt->cmd == cmd_type) ? SBV_OK : -1;
+    return (cmd_pkt->cmd == cmd_type) ? SBV_OK : SBV_ERROR;
 
 ERR_EXIT:
     return -1;
@@ -260,29 +288,10 @@ int
 sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t* seq_num)
 {
     int ret;
-    uint16_t expected_seq_num;
     uint32_t pkt_crc, new_crc;
 
     if (! head_pkt)
         return -1;
-
-    if(head_pkt->h.sof != SBV_OTA_SOF)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(head_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_HEADER)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(head_pkt->h.length != SBV_OTA_HEADER_PACKET_LEN)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
 
     pkt_crc         = head_pkt->h.crc;
     head_pkt->h.crc = 0;
@@ -301,16 +310,13 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
         return -1;
     }
 
-    expected_seq_num = *seq_num + SBV_OTA_HEADER_PACKET_LEN;
-    ret = sbv_ota_seq_num_validate (head_pkt->h.seq_num, expected_seq_num);
+    ret = sbv_ota_seq_num_validate (seq_num, head_pkt->h.seq_num, SBV_OTA_HEADER_PACKET_LEN);
     if (ret != SBV_OK) {
         // LOG
         return ret;
     }
 
-    *seq_num = expected_seq_num;
-
-    return 0;
+    return SBV_OK;
 
 ERR_EXIT:
     return -1;
@@ -320,30 +326,10 @@ int
 sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_length, uint16_t* seq_num)
 {
     int ret;
-    uint16_t expected_seq_num;
     uint32_t pkt_crc, new_crc;
 
     if (! data_pkt)
         return -1;
-
-    if((data_pkt->h.sof != SBV_OTA_SOF))
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(data_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_DATA)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(data_pkt->h.length != pkt_length - (sizeof (sbv_ota_data_pkt_t))
-        || data_pkt->h.length > SBV_OTA_DATA_MAX_SIZE)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
 
     pkt_crc         = data_pkt->h.crc;
     data_pkt->h.crc = 0;
@@ -354,16 +340,13 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
         goto ERR_EXIT;
     }
 
-    expected_seq_num = *seq_num + data_pkt->h.length;
-    ret = sbv_ota_seq_num_validate (data_pkt->h.seq_num, expected_seq_num);
+    ret = sbv_ota_seq_num_validate (seq_num, data_pkt->h.seq_num, data_pkt->h.length);
     if (ret != SBV_OK) {
         // LOG
         return ret;
     }
 
-    *seq_num = expected_seq_num;
-
-    return 0;
+    return SBV_OK;
 
 ERR_EXIT:
     return -1;
@@ -373,29 +356,10 @@ int
 sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq_num)
 {
     int ret;
-    uint16_t expected_seq_num;
     uint32_t pkt_crc, new_crc;
 
     if (! resp_pkt)
         return -1;
-
-    if((resp_pkt->h.sof != SBV_OTA_SOF))
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(resp_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_RESPONSE)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(resp_pkt->h.length != SBV_OTA_RESP_PACKET_LEN)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
 
     pkt_crc         = resp_pkt->h.crc;
     resp_pkt->h.crc = 0;
@@ -406,14 +370,11 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
         goto ERR_EXIT;
     }
 
-    expected_seq_num = *seq_num + SBV_OTA_RESP_PACKET_LEN;
-    ret = sbv_ota_seq_num_validate (resp_pkt->h.seq_num, expected_seq_num);
+    ret = sbv_ota_seq_num_validate (seq_num, resp_pkt->h.seq_num, SBV_OTA_RESP_PACKET_LEN);
     if (ret != SBV_OK) {
         // LOG
         return ret;
     }
-
-    *seq_num = expected_seq_num;
 
     return 0;
 
@@ -431,24 +392,6 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
     if (! report_pkt)
         return -1;
 
-    if(report_pkt->h.sof != SBV_OTA_SOF)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(report_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_REPORT)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
-    if(report_pkt->h.length != SBV_OTA_REP_PACKET_LEN)
-    {
-        /* LOG */
-        goto ERR_EXIT;
-    }
-
     pkt_crc            = report_pkt->h.crc;
     report_pkt->h.crc  = 0;
     new_crc            = sbv_ota_frame_crc((uint8_t *)report_pkt, sizeof(sbv_ota_report_pkt_t));
@@ -458,14 +401,11 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
         goto ERR_EXIT;
     }
 
-    expected_seq_num = *seq_num + SBV_OTA_REP_PACKET_LEN;
-    ret = sbv_ota_seq_num_validate (report_pkt->h.seq_num, expected_seq_num);
+    ret = sbv_ota_seq_num_validate (seq_num, report_pkt->h.seq_num, SBV_OTA_REP_PACKET_LEN);
     if (ret != SBV_OK) {
         // LOG
         return ret;
     }
-
-    *seq_num = expected_seq_num;
 
     return 0;
 

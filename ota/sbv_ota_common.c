@@ -331,6 +331,26 @@ sbv_ota_get_random_seq_number (void) {
 }
 
 int
-sbv_ota_seq_num_validate (uint16_t seq_num, uint16_t expected_seq_num) {
-    return (seq_num == expected_seq_num) ? SBV_OK : SBV_ERROR;
+sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t seq_num_offset) {
+    int ret;
+    uint16_t expected_seq_num;
+
+    if (! curr_seq_num) {
+        // LOG
+        return SBV_ERROR;
+    }
+
+    expected_seq_num = *curr_seq_num + seq_num_offset;
+        
+    if (new_seq_num == expected_seq_num) {
+        *curr_seq_num = expected_seq_num;
+        return SBV_OK;
+    }
+    
+    if (new_seq_num == *curr_seq_num) {
+        // LOG
+        return SVB_OTA_SEQ_DUP;
+    }
+
+    return SBV_ERROR;
 }

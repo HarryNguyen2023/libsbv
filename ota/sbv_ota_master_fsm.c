@@ -13,7 +13,7 @@
 #define SBV_OTA_MASTER_RX_QUEUE_LEN    5
 #define SBV_OTA_MASTER_PRIO            2
 
-#define SBV_OTA_MASTER_RCV_BUFFER_SIZE      16
+#define SBV_OTA_MASTER_RCV_BUFFER_SIZE      (sizeof(sbv_ota_report_pkt_t))
 #define SBV_OTA_MASTER_MSG_TIMEOUT_MS       100
 #define SBV_OTA_MASTER_END_MSG_TIMEOUT_MS   (10 * 1000)
 
@@ -415,9 +415,23 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
         return -1;
     }
 
-    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &resp_pkt,
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(resp_pkt.h),
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
-                                    sizeof(sbv_ota_resp_pkt_t), timeout_ms);
+                                    sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_packet_header_validate (&(resp_pkt.h), SBV_OTA_PACKET_TYPE_RESPONSE);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+    
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(resp_pkt.status),
+                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
+                                    resp_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -448,9 +462,23 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
         return -1;
     }
 
-    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &report_pkt,
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(report_pkt.h),
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
-                                    sizeof(sbv_ota_report_pkt_t), timeout_ms);
+                                    sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_packet_header_validate (&(report_pkt.h), SBV_OTA_PACKET_TYPE_REPORT);
+    if (ret != SBV_OK) {
+        // LOG
+        return ret;
+    }
+
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(report_pkt.upd_fw_metadata),
+                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
+                                    report_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
         // LOG
         return ret;
