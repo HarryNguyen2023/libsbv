@@ -178,7 +178,7 @@ sbv_ota_calculate_crc (uint8_t *buffer, uint32_t buffer_length)
 }
 
 /*
- * @brief: Calculate the HMAC for the firmware image metadata on the fielsystem for validity check
+ * @brief: Calculate the CRC for the firmware image metadata on the fielsystem for validity check
  *          1st, Calculate the CRC of the firmware storage register address
  *          2nd, Calcualte the CRC of the combination of fw version, fw timestampt, and the 1st CRC
  * @param page_addr: firmware storage register address

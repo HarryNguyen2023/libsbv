@@ -30,12 +30,15 @@
 #define SBV_OTA_SLOT_PAGE_ADDR(SLOT) \
         (SLOT == 0) ? SBV_OTA_SLOT0_FLASH_ADD : SBV_OTA_SLOT1_FLASH_ADD
 
+#define SBV_OTA_FW_VERSION_LENGTH   12
+#define SBV_OTA_FW_TIME_LENGTH      20
+
 typedef struct sbv_ota_fw_metadata_t
 {
   uint32_t  fw_size;
   uint32_t  fw_crc;
-  char      fw_timestamp[20];
-  char      fw_version[12];
+  char      fw_timestamp[SBV_OTA_FW_TIME_LENGTH];
+  char      fw_version[SBV_OTA_FW_VERSION_LENGTH];
 } sbv_ota_fw_metadata_t;
 
 /* Slot configuration */

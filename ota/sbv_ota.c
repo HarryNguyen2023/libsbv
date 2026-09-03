@@ -5,8 +5,8 @@
 #include "sbv_rtos.h"
 #include "sbv_gpio.h"
 #include "sbv_cqbuff.h"
-#include "sbv_ota_common.h"
 #include "sbv_ota.h"
+#include "sbv_ota_common.h"
 #include "sbv_ota_msg.h"
 
 #define SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS (5 * 1000)
@@ -170,7 +170,7 @@ static int
 sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
                               uint32_t* slot_pag_add, uint8_t* inactive_slot)
 {
-    int ret, cmp_version;
+    int ret, cmp_version, cmp_timestampt;
     sbv_ota_fw_metadata_t current_fw_metadata;
 
     if (! fw_metadata || ! slot_pag_add || ! inactive_slot)
@@ -191,8 +191,16 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
         return SBV_ERROR;
     }
 
+    // Compare firmware timestampt to avoid old firmware or future enforcement attack
+    cmp_timestampt = memcmp (&(fw_metadata->fw_timestamp), &(current_fw_metadata.fw_timestamp), SBV_OTA_FW_TIME_LENGTH);
+    if (cmp_timestampt < 0) {
+        // LOG
+        return SBV_ERROR;
+    }
+    // TODO: check the new fw timestampt with current system time
+
     /* Check if the on going fw has the same metadata or not, to continue the process */
-    cmp_version = memcmp (&fw_metadata, &current_fw_metadata, sizeof(sbv_ota_fw_metadata_t));
+    cmp_version = memcmp (&(fw_metadata->fw_version), &(current_fw_metadata.fw_version), SBV_OTA_FW_VERSION_LENGTH);
     if (cmp_version == 0)
     {
         /* LOG */
