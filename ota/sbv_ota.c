@@ -362,6 +362,10 @@ int
 sbv_ota_process_update_fw_cmd (void)
 {
     int ret;
+    uint8_t inactive_slot;
+    uint32_t slot_pag_add;
+    uint8_t *fw_data;
+    sbv_ota_fw_metadata_t *fw_metadata = NULL;
     sbv_ota_system_msg_t *rcv_msg;
     
     sbv_rtos_mutex_lock(sbv_ota_installer.mutex);
@@ -382,10 +386,6 @@ sbv_ota_process_update_fw_cmd (void)
     switch (rcv_msg->event)
     {
     case SBV_OTA_EVENT_UDP_START:
-        uint8_t inactive_slot;
-        uint32_t slot_pag_add;
-        sbv_ota_fw_metadata_t *fw_metadata = NULL;
-
         slot_pag_add  = 0;
         inactive_slot = SBV_OTA_INVALID_SLOT;
         sbv_ota_set_update_status (SBV_TRUE);
@@ -405,7 +405,6 @@ sbv_ota_process_update_fw_cmd (void)
         break;
 
     case SBV_OTA_EVENT_IMG_WRITE:
-        uint8_t *fw_data = NULL;
         fw_data = (uint8_t *)rcv_msg->data;
         ret = sbv_ota_save_fw_image_to_flash (fw_data, sbv_ota_installer.fw_metadata.fw_size,
                                               sbv_ota_installer.slot_pag_add);
