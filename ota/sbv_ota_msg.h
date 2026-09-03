@@ -27,8 +27,6 @@ typedef enum sbv_ota_cmd_t
 {
 	SBV_OTA_CMD_START,
 	SBV_OTA_CMD_END,
-	SBV_OTA_CMD_ABORT,
-  SBV_OTA_CMD_MAX,
 } sbv_ota_cmd_t;
 
 typedef enum sbv_ota_upd_status

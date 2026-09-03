@@ -234,6 +234,11 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
             continue;
         }
 
+        if (! sbv_ota_master_fsm_is_acknowledged()) {
+            retry_time++;
+            continue;
+        }
+
         /* LOG */
         break;
     }
@@ -280,6 +285,11 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
         if (ret != SBV_OK)
         {
             /* LOG */
+            retry_time++;
+            continue;
+        }
+
+        if (! sbv_ota_master_fsm_is_acknowledged()) {
             retry_time++;
             continue;
         }
@@ -339,6 +349,11 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
                 continue;
             }
 
+            if (! sbv_ota_master_fsm_is_acknowledged()) {
+                retry_time++;
+                continue;
+            }
+
             /* LOG */
             break;
         }
@@ -384,6 +399,11 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         if (ret != SBV_OK)
         {
             /* LOG */
+            retry_time++;
+            continue;
+        }
+
+        if (! sbv_ota_master_fsm_is_acknowledged()) {
             retry_time++;
             continue;
         }
