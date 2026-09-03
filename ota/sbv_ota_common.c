@@ -85,7 +85,7 @@ sbv_ota_cfg_commit(sbv_ota_general_cfg_t *c) {
 
     if (! c) {
         // LOG
-        return;
+        return SBV_ERROR;
     }
 
     c->magic = SBV_OTA_CONFIG_FLASH_ADD;
