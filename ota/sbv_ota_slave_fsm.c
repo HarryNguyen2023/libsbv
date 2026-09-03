@@ -345,7 +345,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
         return ret;
     }
 
-    if (data_pkt->h.length > rcv_data_size) {
+    if (common_header.length > rcv_data_size) {
         // LOG
         return SBV_ERROR;
     }
@@ -373,7 +373,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
         goto ERR_EXIT;
     }
 
-    memcpy (slave_handler->fw_image + slave_handler->current_rcv_image_size, data_pkt->data, rcv_data_size);
+    memcpy (slave_handler->fw_image + slave_handler->current_rcv_image_size, data_pkt->data, common_header.length);
 
     sbv_rtos_free (data_pkt);
 
@@ -487,7 +487,7 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
+    sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
     ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret2 != SBV_OK)

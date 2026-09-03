@@ -334,10 +334,6 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
             ret = sbv_ota_master_fsm_handle_resp (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
             if (ret != SBV_OK)
             {
-                if (ret == SVB_OTA_SEQ_DUP) {
-                    // LOG
-                    break;
-                }
                 /* LOG */
                 retry_time++;
                 continue;
@@ -387,10 +383,6 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_master_fsm_handle_report (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_END_MSG_TIMEOUT_MS);
         if (ret != SBV_OK)
         {
-            if (ret == SVB_OTA_SEQ_DUP) {
-                // LOG
-                break;
-            }
             /* LOG */
             retry_time++;
             continue;
@@ -446,7 +438,7 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
     }
 
     ret = sbv_ota_msg_rx_resp_packet_validate (&resp_pkt, &(master_handler->peer_seq_num));
-    if (ret != SBV_OK) {
+    if (ret != SBV_OK && ret != SVB_OTA_SEQ_DUP) {
         // LOG
         return ret;
     }
@@ -484,7 +476,7 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
         return ret;
     }
 
-    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(report_pkt.upd_fw_metadata),
+    ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(report_pkt.status),
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     report_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
