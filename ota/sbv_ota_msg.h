@@ -41,18 +41,23 @@ typedef enum sbv_ota_upd_status
 typedef struct sbv_ota_pkt_common_header_t {
   uint8_t   sof;
   uint8_t   packet_type;
+  uint16_t  length;
+#define SBV_OTA_CMD_PACKET_LEN    (1)
+#define SBV_OTA_HEADER_PACKET_LEN (sizeof(sbv_ota_fw_metadata_t))
+#define SBV_OTA_RESP_PACKET_LEN   (1)
+#define SBV_OTA_REP_PACKET_LEN    (1 + sizeof(sbv_ota_fw_metadata_t))
   uint16_t  seq_num;
   uint32_t  crc;
-} sbv_ota_pkt_common_header_t;
+} __attribute__((packed)) sbv_ota_pkt_common_header_t;
 
 /*
  * OTA Command format
  *
- * __________________________________
- * |     | Packet |     |     |     |
- * | SOF |  Type  | SEQ | CRC | CMD |
- * |_____|________|_____|_____|_____|
- *   1B      1B     2B     4B    1B
+ * ________________________________________
+ * |     | Packet |     |     |     |     |
+ * | SOF |  Type  | LEN | SEQ | CRC | CMD |
+ * |_____|________|_____|_____|_____|_____|
+ *   1B      1B     2B    2B     4B    1B
  */
 typedef struct sbv_ota_cmd_pkt_t
 {
@@ -63,11 +68,11 @@ typedef struct sbv_ota_cmd_pkt_t
 /*
  * OTA Header format
  *
- * _____________________________________
- * |     | Packet |     |     | HEADER |
- * | SOF |  Type  | SEQ | CRC |  DATA  |
- * |_____|________|_____|_____|________|
- *   1B      1B      2B    4B     40B
+ * ___________________________________________
+ * |     | Packet |     |     |     | HEADER |
+ * | SOF |  Type  | LEN | SEQ | CRC |  DATA  |
+ * |_____|________|_____|_____|_____|________|
+ *   1B      1B     2B    2B    4B     40B
  */
 typedef struct sbv_ota_header_pkt_t
 {
@@ -78,11 +83,11 @@ typedef struct sbv_ota_header_pkt_t
 /*
  * OTA Data format
  *
- * ____________________________________
- * |     | Packet |     |     |        |
- * | SOF |  Type  | SEQ | CRC |  Data  |
- * |_____|________|_____|_____|________|
- *   1B      1B     2B     4B    nBytes  
+ * __________________________________________
+ * |     | Packet |     |     |     |        |
+ * | SOF |  Type  | LEN | SEQ | CRC |  Data  |
+ * |_____|________|_____|_____|_____|________|
+ *   1B      1B     2B    2B     4B    nBytes  
  */
 typedef struct sbv_ota_data_pkt_t
 {
@@ -93,11 +98,11 @@ typedef struct sbv_ota_data_pkt_t
 /*
  * OTA Response format
  *
- * _____________________________________
- * |     | Packet |     |     |        |
- * | SOF |  Type  | SQE | CRC | Status |
- * |_____|________|_____|_____|________|
- *   1B      1B     2B     4B     1B
+ * ___________________________________________
+ * |     | Packet |     |     |     |        |
+ * | SOF |  Type  | LEN | SEQ | CRC | Status |
+ * |_____|________|_____|_____|_____|________|
+ *   1B      1B     2B    2B     4B     1B
  */
 typedef struct sbv_ota_resp_pkt_t
 {
@@ -108,11 +113,11 @@ typedef struct sbv_ota_resp_pkt_t
 /*
  * OTA Report format
  *
- * ______________________________________________
- * |     | Packet |     |     |        | Header |
- * | SOF |  Type  | SEQ_| CRC | Status |  Data  |
- * |_____|________|_____|_____|________|________|
- *   1B      1B      2B   4B     1B       40B
+ * ____________________________________________________
+ * |     | Packet |     |     |     |        | Header |
+ * | SOF |  Type  | LEN | SEQ_| CRC | Status |  Data  |
+ * |_____|________|_____|_____|_____|________|________|
+ *   1B      1B     2B    2B     4B     1B       40B
  */
 typedef struct sbv_ota_report_pkt_t
 {

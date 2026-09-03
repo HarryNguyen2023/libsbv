@@ -58,6 +58,7 @@ sbv_ota_msg_send_resp (uint8_t resp_type, uint16_t seq_num, uint16_t timeout_ms)
 
     resp_pkt.h.sof 			= SBV_OTA_SOF;
     resp_pkt.h.packet_type 	= SBV_OTA_PACKET_TYPE_RESPONSE;
+    resp_pkt.h.length       = SBV_OTA_RESP_PACKET_LEN;
     resp_pkt.h.seq_num      = seq_num;
     resp_pkt.h.crc          = 0;
     resp_pkt.status 		= resp_type;
@@ -82,6 +83,7 @@ sbv_ota_msg_send_report (const sbv_ota_upd_status upd_status, uint16_t seq_num,
 
     report_pkt.h.sof 			= SBV_OTA_SOF;
     report_pkt.h.packet_type 	= SBV_OTA_PACKET_TYPE_REPORT;
+    report_pkt.h.length         = SBV_OTA_REP_PACKET_LEN;
     report_pkt.h.seq_num        = seq_num;
     report_pkt.h.crc            = 0;
     report_pkt.status 		    = upd_status;
@@ -101,6 +103,7 @@ sbv_ota_msg_send_cmd (sbv_ota_cmd_t cmd_type, uint16_t seq_num, uint16_t timeout
 
     cmd_pkt.h.sof 			= SBV_OTA_SOF;
     cmd_pkt.h.packet_type 	= SBV_OTA_PACKET_TYPE_CMD;
+    cmd_pkt.h.length        = SBV_OTA_CMD_PACKET_LEN;
     cmd_pkt.h.seq_num       = seq_num;
     cmd_pkt.h.crc           = 0;
     cmd_pkt.cmd 		    = cmd_type;
@@ -129,6 +132,7 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info, ui
 
     header_pkt.h.sof           = SBV_OTA_SOF;
     header_pkt.h.packet_type   = SBV_OTA_PACKET_TYPE_HEADER;
+    header_pkt.h.length        = SBV_OTA_HEADER_PACKET_LEN;
     header_pkt.h.seq_num       = seq_num;
     header_pkt.h.crc           = 0;
     memcpy (&header_pkt.data_info, data_info, sizeof (sbv_ota_fw_metadata_t));
@@ -166,6 +170,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
 
     data_pkt->h.sof           = SBV_OTA_SOF;
     data_pkt->h.packet_type   = SBV_OTA_PACKET_TYPE_DATA;
+    data_pkt->h.length        = data_length;
     data_pkt->h.seq_num       = seq_num;
     data_pkt->h.crc           = 0;
     memcpy(data_pkt->data, data, data_length);
@@ -217,6 +222,11 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
         goto ERR_EXIT;
     }
 
+    if (cmd_pkt->h.length != SBV_OTA_CMD_PACKET_LEN) {
+        // LOG
+        goto ERR_EXIT;
+    }
+
     pkt_crc         = cmd_pkt->h.crc;
     cmd_pkt->h.crc  = 0;
     new_crc         = sbv_ota_frame_crc((uint8_t *)cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
@@ -262,6 +272,12 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     }
 
     if(head_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_HEADER)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if(head_pkt->h.length != SBV_OTA_HEADER_PACKET_LEN)
     {
         /* LOG */
         goto ERR_EXIT;
@@ -320,6 +336,13 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
         goto ERR_EXIT;
     }
 
+    if(data_pkt->h.length != pkt_length - (sizeof (sbv_ota_data_pkt_t))
+        || data_pkt->h.length > SBV_OTA_DATA_MAX_SIZE)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
     pkt_crc         = data_pkt->h.crc;
     data_pkt->h.crc = 0;
     new_crc         = sbv_ota_frame_crc((uint8_t *)data_pkt, pkt_length);
@@ -358,6 +381,12 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
     }
 
     if(resp_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_RESPONSE)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if(resp_pkt->h.length != SBV_OTA_RESP_PACKET_LEN)
     {
         /* LOG */
         goto ERR_EXIT;
@@ -403,6 +432,12 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
     }
 
     if(report_pkt->h.packet_type != SBV_OTA_PACKET_TYPE_REPORT)
+    {
+        /* LOG */
+        goto ERR_EXIT;
+    }
+
+    if(report_pkt->h.length != SBV_OTA_REP_PACKET_LEN)
     {
         /* LOG */
         goto ERR_EXIT;
