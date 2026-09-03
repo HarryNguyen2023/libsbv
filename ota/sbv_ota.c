@@ -173,7 +173,7 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
 
     // Check if the new firmware size is larger the allowable size of A/B partition
     // to avoid the firmware overload attack
-    if (fw_metadata->fw_size > SBV_OTA_SLOT_MAX_SIZE)
+    if (fw_metadata->fw_size == 0 || fw_metadata->fw_size > SBV_OTA_SLOT_MAX_SIZE)
     {
         /* LOG */
         return SBV_ERROR;
@@ -237,7 +237,7 @@ sbv_ota_save_fw_image_to_flash (uint8_t *fw_img, const uint32_t fw_size, const u
     uint32_t last_page_size;
     uint32_t curr_page_addr, curr_fw_img_head;
 
-    if (! fw_img || fw_size == 0) {
+    if (! fw_img || fw_size == 0 || fw_size > SBV_OTA_SLOT_MAX_SIZE) {
         // LOG
         return SBV_ERROR;
     }
@@ -315,6 +315,8 @@ sbv_ota_handle_final_upd (const uint32_t slot_pag_addr, const uint8_t inactive_s
         /* LOG */
         return SBV_ERROR;
     }
+
+    sbv_ota_send_system_msg_ack(sbv_ota_installer.tx_queue, SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS);
 
     sbv_ota_system_reset ();
 
