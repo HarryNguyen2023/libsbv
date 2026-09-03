@@ -11,10 +11,10 @@
 
 #define SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS (5 * 1000)
 #define SBV_OTA_UPDATE_FW_PRIO          2
-#define SBV_OTA_UPDATE_WATCHDOG_MS      5000
-#define SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS 5
+#define SBV_OTA_UPDATE_WATCHDOG_MS      (5 * 1000)
+#define SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS (100)
 
-#define SBV_OTA_QUEUE_LEN 5
+#define SBV_OTA_QUEUE_LEN   1
 
 sbv_rtos_task_handle_t sbv_ota_update_fw_handle;
 static sbv_rtos_stack_type_t sbv_ota_fw_update_stack[STACK_SIZE_BASE * 4];

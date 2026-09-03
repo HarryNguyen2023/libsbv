@@ -16,7 +16,8 @@
 #define SBV_OTA_SLAVE_MSG_TIMEOUT_MS    100
 #define SBV_OTA_BLOCKING_MAX_DELAY_MS   (UINT32_MAX)
 
-#define SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS 100
+#define SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS  100
+#define SBV_OTA_SLAVE_SYSTEM_MSG_RX_TIMEOUT_MS  (2 * 1000)
 
 #define SBV_OTA_SLAVE_NEXT_STATE(NS,RET,RESP)   \
     (RET!=SBV_OK) ? SBV_OTA_STATE_IDLE :        \
@@ -594,7 +595,7 @@ sbv_ota_slave_fsm_system_msg_handle (void) {
     memset (&system_msg, 0, sizeof (sbv_ota_system_msg_t));
 
     ret = sbv_ota_rcv_system_msg (sbv_ota_msg_slave_handler.slave_rx_installer_tx_queue,
-                                  &system_msg, SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
+                                  &system_msg, SBV_OTA_SLAVE_SYSTEM_MSG_RX_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -620,7 +621,7 @@ sbv_ota_slave_fsm_start_fw_update (void) {
 
     ret = sbv_ota_send_system_msg_udp_start (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
                                             &(sbv_ota_msg_slave_handler.new_fw_metadata),
-                                            SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
+                                            SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -641,7 +642,7 @@ sbv_ota_slave_fsm_send_img_to_installer (void) {
 
     ret = sbv_ota_send_system_msg_image_write (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
                                                sbv_ota_msg_slave_handler.fw_image,
-                                               SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
+                                               SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
         return ret;
@@ -661,7 +662,7 @@ sbv_ota_slave_fsm_stop_fw_update (void) {
     int ret;
 
     ret = sbv_ota_send_system_msg_udp_finalize (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
-                                                SBV_OTA_SLAVE_SYSTEM_MSG_TIMEOUT_MS);
+                                                SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS);
     if (ret != SBV_OK) {
         // LOG
         return ret;
