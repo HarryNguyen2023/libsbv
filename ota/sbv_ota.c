@@ -67,7 +67,7 @@ sbv_ota_is_update_enable (void)
     return sbv_ota_installer.is_update_enable;
 }
 
-uint8_t
+void
 sbv_ota_set_update_enable (uint8_t is_update_enable)
 {
     sbv_ota_installer.is_update_enable = is_update_enable;
@@ -256,9 +256,10 @@ int
 sbv_ota_save_fw_image_to_flash (uint8_t *fw_img, const uint32_t fw_size, const uint32_t slot_pag_addr)
 {
     int ret;
+    uint8_t *curr_fw_img_head;
     uint32_t page_num;
     uint32_t last_page_size;
-    uint32_t curr_page_addr, curr_fw_img_head;
+    uint32_t curr_page_addr;
 
     if (! fw_img || fw_size == 0 || fw_size > SBV_OTA_SLOT_MAX_SIZE) {
         // LOG

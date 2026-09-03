@@ -21,6 +21,6 @@ typedef struct sbv_ota_msg_master_handler_t
 } sbv_ota_msg_master_handler_t;
 
 void
-sbv_task_ota_update_fw_master (void* param);
+sbv_ota_master_fsm_init (void);
 
 #endif /* SBV_OTA_MASTER_FSM_H */

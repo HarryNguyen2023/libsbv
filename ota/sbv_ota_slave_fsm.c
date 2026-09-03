@@ -320,7 +320,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
     ret = sbv_ota_msg_rx_data_packet_validate (data_pkt, rcv_size, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
         // LOG
-        return ret;
+        goto ERR_EXIT;
     }
 
     memcpy (slave_handler->fw_image + slave_handler->current_rcv_image_size, data_pkt->data, rcv_data_size);

@@ -13,6 +13,7 @@
 #include "sbv_ota.h"
 #include "sbv_ota_msg.h"
 #include "sbv_ota_slave_fsm.h"
+#include "sbv_ota_master_fsm.h"
 #include "sbv_pid.h"
 #include "sbv_gpio.h"
 #include "sbv_motor.h"
@@ -49,6 +50,7 @@ void sbv_led_init_blink (void);
 void sbv_task_init(void);
 void sbv_task_balance_control(void *param);
 void sbv_task_debug_console_task(void *param);
+void sbv_task_ota_init (uint8_t is_master);
 
 void
 sbv_init(void)
