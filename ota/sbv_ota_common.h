@@ -145,7 +145,7 @@ sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t
 void
 sbv_ota_random_init_unique(void);
 uint8_t
-sbv_ota_fw_version_encode(const char *str, sbv_ota_fw_version_t *ver);
+sbv_ota_fw_version_encode(char *str, sbv_ota_fw_version_t *ver);
 uint8_t
 sbv_ota_fw_version_decode(const char *str, sbv_ota_fw_version_t *ver);
 int

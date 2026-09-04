@@ -329,10 +329,9 @@ sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event
 void
 sbv_ota_random_init_unique(void)
 {
-    uint32_t *uid, system_uid;
+    uint32_t *uid;
 
-    system_uid = sbv_system_get_uid();
-    uid = (uint32_t *)system_uid;
+    *uid = sbv_system_get_uid();
 
     // Mix the 96-bit UID into a 32-bit seed
     uint32_t seed = uid[0] ^ uid[1] ^ uid[2];
@@ -373,7 +372,7 @@ sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t
 
 // Parse "A.B.CDEF" into structure
 uint8_t
-sbv_ota_fw_version_encode(const char *str, sbv_ota_fw_version_t *ver)
+sbv_ota_fw_version_encode(char *str, sbv_ota_fw_version_t *ver)
 {
     if (!str || !ver) return SBV_FALSE;
 
