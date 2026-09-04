@@ -4,6 +4,12 @@
 #include "sbv_pid.h"
 #include "sbv_control_cfg.h"
 
+#ifdef STM32F1xx
+extern sbv_time_handle_type_def htim2;
+extern sbv_time_handle_type_def htim3;
+extern sbv_time_handle_type_def htim4;
+#endif /* STM32F1xx */
+
 sbv_motor_t motor_left = 
 {
 #ifdef STM32F1xx
@@ -17,6 +23,8 @@ sbv_motor_t motor_left =
     .pwm_channel        = SBV_PWM_CHANNEL_1,
     .encoder_tim        = SBV_TIM_2,
     .pwm_tim            = SBV_TIM_4,
+    .encoder_tim_def    = &htim2,
+    .pwm_tim_def        = &htim4,
 #endif /* STM32F1xx */
 
     .encoder_rev        = 374,
@@ -39,6 +47,8 @@ sbv_motor_t motor_right =
     .pwm_channel        = SBV_PWM_CHANNEL_2,
     .encoder_tim        = SBV_TIM_3,
     .pwm_tim            = SBV_TIM_4,
+    .encoder_tim_def    = &htim3,
+    .pwm_tim_def        = &htim4,
 #endif /* STM32F1xx */
 
     .encoder_rev        = 374,

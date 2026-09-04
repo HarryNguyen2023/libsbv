@@ -12,6 +12,7 @@
 #define SBV_TIM_4   TIM4
 
 typedef TIM_TypeDef sbv_tim_type_def;
+typedef TIM_HandleTypeDef sbv_time_handle_type_def;
 
 typedef enum sbv_motor_pwm_t
 {
@@ -43,6 +44,9 @@ typedef struct sbv_motor_t
     sbv_motor_pwm_t     pwm_channel;
     sbv_tim_type_def*   encoder_tim;
     sbv_tim_type_def*   pwm_tim;
+
+    sbv_time_handle_type_def *encoder_tim_def;
+    sbv_time_handle_type_def *pwm_tim_def;
 #endif /* STM32F1xx */
 
     uint16_t            encoder_rev;

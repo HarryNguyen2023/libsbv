@@ -267,7 +267,7 @@ sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
     if (can_instance->can_rcv_buf)
     {
         sbv_cqbuff_write (can_instance->can_rcv_buf,
-                          &can_rx_packet, sizeof(sbv_can_rx_pkt_t));
+                          (unsigned char *)&can_rx_packet, sizeof(sbv_can_rx_pkt_t));
     }
 
     if(can_instance->can_rx_notify_task != NULL)

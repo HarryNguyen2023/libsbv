@@ -25,8 +25,8 @@
 static sbv_rtos_stack_type_t debug_stack[STACK_SIZE_BASE];
 static sbv_rtos_stack_type_t balance_crtl_stack[STACK_SIZE_BASE * 4];
 
-sbv_rtos_task_handle_t sbv_debug_handle;
-sbv_rtos_task_handle_t sbv_balance_ctrl_handle;
+sbv_rtos_static_task_t sbv_debug_handle;
+sbv_rtos_static_task_t sbv_balance_ctrl_handle;
 
 /* Control task's obbjects */
 sbv_control_balance_t   sbv_control_balance;
@@ -70,7 +70,7 @@ sbv_init(void)
     /* Blink LED and wait for hardware system to stablize before starting software tasks */
     sbv_led_init_blink();
 
-    sbv_task_ota_init (SBV_FALSE);
+    // sbv_task_ota_init (SBV_FALSE);
 
     sbv_task_init();
 }

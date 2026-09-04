@@ -1,4 +1,8 @@
-#include "math.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
 #include "sbv.h"
 #include "sbv_gpio.h"
 #include "sbv_motor.h"
@@ -35,8 +39,8 @@ sbv_motor_init(sbv_motor_t *motor)
     default:
         break;
     }
-    HAL_TIM_PWM_Start (motor->pwm_tim, tim_channel);
-    HAL_TIM_Encoder_Start (motor->encoder_tim, TIM_CHANNEL_ALL);
+    HAL_TIM_PWM_Start (motor->pwm_tim_def, tim_channel);
+    HAL_TIM_Encoder_Start (motor->encoder_tim_def, TIM_CHANNEL_ALL);
 #endif /* STM32F1xx */
     
     motor->pwm_output       = 0;

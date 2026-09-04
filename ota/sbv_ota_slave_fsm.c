@@ -37,7 +37,7 @@ int sbv_ota_slave_fsm_stop_fw_update (void);
 void sbv_task_ota_update_fw_slave (void* param);
 
 static sbv_rtos_stack_type_t sbv_ota_slave_fsm_stack[STACK_SIZE_BASE * 4];
-sbv_rtos_task_handle_t       sbv_ota_slave_handle;
+sbv_rtos_static_task_t       sbv_ota_slave_handle;
 
 sbv_ota_msg_slave_handler_t sbv_ota_msg_slave_handler;
 

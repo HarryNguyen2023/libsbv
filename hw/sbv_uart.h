@@ -23,9 +23,9 @@ typedef enum sbv_uart_baudrate_t
 
 struct sbv_uart_hw_cb_t
 {
-    sbv_uart_instance_t* (*sbv_uart_init) (sbv_uart_instance_t *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t, void *);
+    int (*sbv_uart_init) (sbv_uart_instance_t *, sbv_uart_handle_t *, sbv_uart_dma_handle_t *, sbv_uart_baudrate_t, void *);
     int (*sbv_uart_tx_send_data) (sbv_uart_instance_t *, uint8_t *, uint16_t, uint16_t);
-    uint8_t* (*sbv_uart_rx_rcv_data) (sbv_uart_instance_t *, uint8_t[], uint16_t, uint16_t);
+    int (*sbv_uart_rx_rcv_data) (sbv_uart_instance_t *, uint8_t[], uint16_t, uint16_t);
     int (*sbv_uart_register_rx_cb) (sbv_uart_instance_t *, int (*uart_rx_cb)(uint8_t *, const uint16_t));
 };
 

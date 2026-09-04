@@ -43,6 +43,7 @@ typedef TimeOut_t               sbv_rtos_timeout_t;
 typedef EventGroupHandle_t      sbv_event_group_handle_t;
 typedef EventBits_t             sbv_rtos_event_bits_t;
 typedef QueueHandle_t           sbv_rtos_queue_handle_t;
+typedef StaticTask_t            sbv_rtos_static_task_t;
 
 #define sbv_rtos_mutex_create(M)  \
         M = xSemaphoreCreateMutex()

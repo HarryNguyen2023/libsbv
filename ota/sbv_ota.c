@@ -17,7 +17,7 @@
 
 #define SBV_OTA_QUEUE_LEN   1
 
-sbv_rtos_task_handle_t sbv_ota_update_fw_handle;
+sbv_rtos_static_task_t sbv_ota_update_fw_handle;
 static sbv_rtos_stack_type_t sbv_ota_fw_update_stack[STACK_SIZE_BASE * 4];
 
 void sbv_ota_update_fw_thread (void *param);

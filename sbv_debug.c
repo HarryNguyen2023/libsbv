@@ -108,7 +108,7 @@ sbv_debug_break_command(char* rcv_buffer, uint16_t size)
 }
 
 int
-sbv_debug_command_handle(char* rcv_buffer, const uint16_t size)
+sbv_debug_command_handle(uint8_t* rcv_buffer, const uint16_t size)
 {
     uint8_t first_command, command_size;
 
