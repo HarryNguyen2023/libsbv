@@ -21,7 +21,9 @@
 
 #elif defined ESP32xx_IDF
 #define SBV_OK      ESP_OK
-#define SBV_ERROR   1u
+#define SBV_ERROR   1u   
+#define SBV_BUSY    2u
+#define SBV_TIMEOUT 3u
 
 #define SBV_TRUE    TRUE
 #define SBV_FALSE   FALSE

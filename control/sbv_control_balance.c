@@ -7,9 +7,6 @@
 #include "sbv_control_cfg.h"
 #include "sbv_control_balance.h"
 
-#define SBV_ROBOT_WHEEL_DIAMETER     (62)
-#define SBV_ROBOT_WHEEL_DISTANCE     (200)
-
 #define SBV_ROBOT_CONTROL_MUTEX_LOCK(S) \
     sbv_rtos_mutex_lock(S->mu)
 #define SBV_ROBOT_CONTROL_MUTEX_UNLOCK(S) \

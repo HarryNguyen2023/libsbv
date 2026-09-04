@@ -75,6 +75,8 @@ struct sbv_ota_fsm_cb_t sbv_ota_master_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STAT
 void
 sbv_ota_master_fsm_init (void)
 {
+    sbv_ota_random_init_unique ();
+
     memset(&sbv_ota_msg_master_handler, 0, sizeof (sbv_ota_msg_master_handler_t));
 
     sbv_ota_msg_master_handler.max_retry    = SBV_OTA_MASTER_TX_MAX_RETRY;
@@ -385,7 +387,6 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
     retry_time = 0;
     while (retry_time < sbv_ota_msg_master_handler.max_retry)
     {
-        sbv_ota_msg_master_handler.is_ack = SBV_FALSE;
         ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_END, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
@@ -399,11 +400,6 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         if (ret != SBV_OK)
         {
             /* LOG */
-            retry_time++;
-            continue;
-        }
-
-        if (! sbv_ota_master_fsm_is_acknowledged()) {
             retry_time++;
             continue;
         }

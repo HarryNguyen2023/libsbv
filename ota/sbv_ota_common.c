@@ -5,6 +5,7 @@
 #include "sbv.h"
 #include "sbv_rtos.h"
 #include "sbv_flash.h"
+#include "sbv_system.h"
 #include "sbv_ota_common.h"
 
 #ifdef SBV_HW_CRC
@@ -323,6 +324,21 @@ sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event
     }
 
     return SBV_OK;
+}
+
+void
+sbv_ota_random_init_unique(void)
+{
+    uint32_t *uid, system_uid;
+
+    system_uid = sbv_system_get_uid();
+    uid = (uint32_t *)system_uid;
+
+    // Mix the 96-bit UID into a 32-bit seed
+    uint32_t seed = uid[0] ^ uid[1] ^ uid[2];
+    seed ^= (uid[0] << 11) | (uid[1] >> 7);
+
+    srand(seed);
 }
 
 uint16_t

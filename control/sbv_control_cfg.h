@@ -1,6 +1,9 @@
 #ifndef __SBV_CONTROL_CFG_H__
 #define __SBV_CONTROL_CFG_H__
 
+#define SBV_ROBOT_WHEEL_DIAMETER     62
+#define SBV_ROBOT_WHEEL_DISTANCE     200
+
 #define MOTOR_LEFT_PID_KP           44.2
 #define MOTOR_LEFT_PID_KI           1.39
 

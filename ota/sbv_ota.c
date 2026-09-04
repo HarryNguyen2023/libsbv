@@ -4,6 +4,7 @@
 #include "sbv.h"
 #include "sbv_rtos.h"
 #include "sbv_gpio.h"
+#include "sbv_system.h"
 #include "sbv_cqbuff.h"
 #include "sbv_ota_common.h"
 #include "sbv_ota.h"
@@ -317,9 +318,7 @@ sbv_ota_system_reset (void)
     /* Reset the system after 10s */
     sbv_rtos_task_delay(sbv_rtos_ms_to_tick(SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS));
 
-#ifdef STM32F1xx
-    HAL_NVIC_SystemReset ();
-#endif /* STM32F1xx */
+    sbv_system_reset ();
 }
 
 int

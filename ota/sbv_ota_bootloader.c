@@ -4,6 +4,7 @@
 #include "sbv.h"
 #include "sbv_rtos.h"
 #include "sbv_gpio.h"
+#include "sbv_system.h"
 #include "sbv_ota_common.h"
 #include "sbv_ota_bootloader.h"
 
@@ -114,33 +115,6 @@ FALL_BACK:
 }
 
 static void
-sbv_ota_bootloader_reset_system (uint32_t slot_addr)
-{
-#ifdef STM32F1xx
-    /* Disable all interrupts */
-    __disable_irq();
-
-    /* Reset the Clock */
-    HAL_RCC_DeInit();
-    HAL_DeInit();
-
-    /* Clear all pending interrupts */
-    NVIC_ClearPendingIRQ((IRQn_Type)0);
-
-    /* Set new Vector Table Offset */
-    SCB->VTOR = slot_addr;
-
-    /* Set the main stack pointer to the application slot */
-    __set_MSP(*(volatile uint32_t*) slot_addr);
-
-    /* Disable Systick interrupt */
-    SysTick->CTRL   = 0;
-    SysTick->LOAD   = 0;
-    SysTick->VAL    = 0;
-#endif /*STM32F1xx*/
-}
-
-static void
 sbv_ota_bootloader_goto_application (uint32_t slot_addr)
 {
     /* Set the function pointer to the start of the app memory address */
@@ -148,7 +122,7 @@ sbv_ota_bootloader_goto_application (uint32_t slot_addr)
 	if(AppReset_Handler == (void*)0xFFFFFFFF)
 		return;
 
-    sbv_ota_bootloader_reset_system (slot_addr);
+    sbv_system_application_shift_to_addr (slot_addr);
 
 	AppReset_Handler();
 }
@@ -161,9 +135,7 @@ sbv_ota_bootloader_init_blink (void)
 
     for (uint8_t i = 0; i < (blink_time_ms / blink_toggle_time_ms); ++i) {
         sbv_gpio_toggle_pin (SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, 0);
-#ifdef STM32F1xx
-        HAL_Delay (blink_toggle_time_ms);
-#endif /* STM32F1xx */
+        sbv_system_delay (blink_toggle_time_ms);
     }
 }
 
@@ -185,9 +157,7 @@ sbv_ota_bootloader_load_new_app (void)
         while (1)
         {
             sbv_gpio_toggle_pin (SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, 0);
-#ifdef STM32F1xx
-            HAL_Delay (500);
-#endif /* STM32F1xx */
+            sbv_system_delay (500);
         }
     }
 
