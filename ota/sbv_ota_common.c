@@ -370,3 +370,59 @@ sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t
 
     return SBV_ERROR;
 }
+
+// Parse "A.B.CDEF" into structure
+uint8_t
+sbv_ota_fw_version_encode(const char *str, sbv_ota_fw_version_t *ver)
+{
+    if (!str || !ver) return SBV_FALSE;
+
+    unsigned int a, b, c;
+    a = (unsigned int)ver->major;
+    b = (unsigned int)ver->minor;
+    c = (unsigned int)ver->build;
+
+    snprintf (str, SBV_OTA_FW_VERSION_LENGTH, "%u.%u.%u", a, b, c);
+    return SBV_TRUE;
+}
+
+// Parse "A.B.CDEF" into structure
+uint8_t
+sbv_ota_fw_version_decode(const char *str, sbv_ota_fw_version_t *ver)
+{
+    if (!str || !ver) return SBV_FALSE;
+
+    unsigned int a, b, c;
+    if (sscanf(str, "%u.%u.%u", &a, &b, &c) != 3) {
+        return SBV_FALSE;
+    }
+
+    ver->major = (uint8_t)a;
+    ver->minor = (uint8_t)b;
+    ver->build = (uint16_t)c;
+    return SBV_TRUE;
+}
+
+// Compare two versions
+// Returns:
+//   > 0  if v1 is newer than v2
+//   < 0  if v1 is older than v2
+//   = 0  if equal
+int
+sbv_ota_fw_version_compare(const sbv_ota_fw_version_t *v1, const sbv_ota_fw_version_t *v2)
+{
+    if (! v1 || ! v2) {
+        return -1;
+    }
+
+    if (v1->major != v2->major)
+        return (v1->major > v2->major) ? 1 : -1;
+
+    if (v1->minor != v2->minor)
+        return (v1->minor > v2->minor) ? 1 : -1;
+
+    if (v1->build != v2->build)
+        return (v1->build > v2->build) ? 1 : -1;
+
+    return 0;
+}

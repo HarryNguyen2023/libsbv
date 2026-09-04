@@ -305,7 +305,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     // TODO: Check fw timestampt vs NOW
 
     // Check firmware size limit
-    if (head_pkt->data_info.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
+    if (head_pkt->data_info.fw_size == 0 || head_pkt->data_info.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
         // LOG
         return -1;
     }

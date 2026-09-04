@@ -38,6 +38,13 @@
 
 #define SBV_OTA_UID_BASE            0x1FFFF7E8UL
 
+typedef struct sbv_ota_fw_version_t
+{
+  uint8_t  major;   // A
+  uint8_t  minor;   // B
+  uint16_t build;   // CDEF
+} sbv_ota_fw_version_t;
+
 typedef struct sbv_ota_fw_metadata_t
 {
   uint32_t  fw_size;
@@ -137,4 +144,10 @@ int
 sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t seq_num_offset);
 void
 sbv_ota_random_init_unique(void);
+uint8_t
+sbv_ota_fw_version_encode(const char *str, sbv_ota_fw_version_t *ver);
+uint8_t
+sbv_ota_fw_version_decode(const char *str, sbv_ota_fw_version_t *ver);
+int
+sbv_ota_fw_version_compare(const sbv_ota_fw_version_t *v1, const sbv_ota_fw_version_t *v2);
 #endif /* SBV_OTA_COMMON_H */
