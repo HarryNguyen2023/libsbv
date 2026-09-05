@@ -20,8 +20,6 @@ sbv_gpio_stm32f1xx_init (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_num, 
     else if(gpio_type == SBV_GPIO_E)
         SBV_GPIO_CLOCK_E_ENABLE();
 
-    sbv_gpio_stm32f1xx_set_pin_level(gpio_type, gpio_num, SBV_GPIO_PIN_LOW);
-
     gpio_init.Pin   = gpio_num;
     gpio_init.Mode  = gpio_mode;
     if(gpio_mode == SBV_GPIO_MODE_INPUT)
@@ -31,6 +29,8 @@ sbv_gpio_stm32f1xx_init (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_num, 
     gpio_init.Speed = SBV_GPIO_SPEED_LOW;
 
     HAL_GPIO_Init(gpio_type, &gpio_init);
+
+    sbv_gpio_stm32f1xx_set_pin_level(gpio_type, gpio_num, SBV_GPIO_PIN_LOW);
 }
 
 void

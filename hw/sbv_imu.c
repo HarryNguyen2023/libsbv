@@ -11,8 +11,8 @@
 #ifdef SBV_MPU9250
 #include "sbv_mpu9250.h"
 
-#define SBV_IMU_PROCESS_NOISE       (0.01)
-#define SBV_IMU_MEASURE_VARIANCE    (0.05)
+#define SBV_IMU_PROCESS_NOISE       (0.01f)
+#define SBV_IMU_MEASURE_VARIANCE    (0.05f)
 #endif /*SBV_MPU9050*/
 
 int

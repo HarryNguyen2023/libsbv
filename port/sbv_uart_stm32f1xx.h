@@ -7,7 +7,7 @@
 #ifdef STM32F1xx
 
 #include "stm32f1xx_hal_uart.h"
-#define SBV_UART_RX_BUFFER_SIZE     512
+#define SBV_UART_RX_BUFFER_SIZE     64
 #define SBV_UART_MAX_CHANNEL        3
 
 typedef UART_HandleTypeDef  sbv_uart_handle_t;

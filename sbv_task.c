@@ -4,6 +4,7 @@
 
 #include "sbv.h"
 #include "sbv_rtos.h"
+#include "sbv_system.h"
 #include "sbv_cqbuff.h"
 #include "sbv_task.h"
 #include "sbv_can.h"
@@ -25,6 +26,7 @@
 static sbv_rtos_stack_type_t debug_stack[STACK_SIZE_BASE];
 static sbv_rtos_stack_type_t balance_crtl_stack[STACK_SIZE_BASE * 4];
 
+sbv_rtos_task_handle_t sbv_default_init_handle;
 sbv_rtos_static_task_t sbv_debug_handle;
 sbv_rtos_static_task_t sbv_balance_ctrl_handle;
 
@@ -38,7 +40,7 @@ extern sbv_i2c_handle_t hi2c1;
 extern sbv_uart_handle_t     huart1;
 extern sbv_uart_dma_handle_t hdma_usart1_rx;
 sbv_gpio_num_t               uart_pin[2] = {SBV_GPIO_NUM_13, SBV_GPIO_NUM_7};
-sbv_uart_instance_t          sbv_uart_1;
+sbv_uart_instance_t          sbv_uart_1 = {0};
 
 /* CAN router task's object */
 extern sbv_can_handle_t     hcan;
@@ -53,8 +55,8 @@ void sbv_task_debug_console_task(void *param);
 void sbv_task_ota_init (uint8_t is_master);
 
 void
-sbv_init(void)
-{
+sbv_default_init_task (void *param) {
+
     /* Built-in LED initialization */
     sbv_gpio_init(SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, SBV_GPIO_MODE_OUTPUT);
 
@@ -62,7 +64,7 @@ sbv_init(void)
     sbv_uart_init(&sbv_uart_1, &huart1, &hdma_usart1_rx, SBV_UART_BAUDRATE_115200, uart_pin);
 
     /* CAN interface initialization */
-    sbv_can_init(&sbv_can_instance, &hcan);
+    // sbv_can_init(&sbv_can_instance, &hcan);
 
     /* Initialize the robot control system */
     sbv_control_balance_init(&sbv_control_balance, &sbv_imu_instance, &sbv_i2c_1, &hi2c1);
@@ -70,19 +72,30 @@ sbv_init(void)
     /* Blink LED and wait for hardware system to stablize before starting software tasks */
     sbv_led_init_blink();
 
-    // sbv_task_ota_init (SBV_FALSE);
+    sbv_task_ota_init (SBV_FALSE);
 
     sbv_task_init();
+
+    sbv_rtos_task_delete (sbv_default_init_handle);
 }
 
+void
+sbv_init(void)
+{
+    xTaskCreate(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
+
+    sbv_rtos_start_task_scheduler();
+}
+ 
 void
 sbv_led_init_blink (void)
 {
     uint16_t blink_time_ms          = 5000;
-    uint16_t blink_toggle_time_ms   = 100;
+    uint16_t blink_toggle_time_ms   = 250;
 
-    for (uint8_t i = 0; i < (blink_time_ms / blink_toggle_time_ms); ++i)
+    for (uint8_t i = 0; i < (blink_time_ms / blink_toggle_time_ms); ++i) {
         sbv_gpio_toggle_pin (SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, blink_toggle_time_ms);
+    }
 }
 
 void
@@ -93,8 +106,6 @@ sbv_task_init(void)
 
     sbv_rtos_task_create(sbv_task_balance_control, "balance_ctrl", STACK_SIZE_BASE * 4,
                         NULL, 4, balance_crtl_stack, &sbv_balance_ctrl_handle);
-
-    sbv_rtos_start_task_scheduler();
 }
 
 /*
