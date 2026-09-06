@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_system_stm32f1xx.h"
 
 uint32_t
@@ -12,6 +13,8 @@ sbv_system_stm32f1xx_get_uid (void) {
 
 void
 sbv_system_stm32f1xx_reset (void) {
+    LOG_INFO ("Shutting down the STM32 system");
+
     HAL_NVIC_SystemReset ();
 }
 
@@ -37,6 +40,8 @@ sbv_system_stm32f1xx_application_shift_to_addr (uint32_t new_app_addr) {
     SysTick->CTRL   = 0;
     SysTick->LOAD   = 0;
     SysTick->VAL    = 0;
+
+    LOG_INFO ("Loading SP and VTOR to new application addr %x", new_app_addr);
 }
 
 void

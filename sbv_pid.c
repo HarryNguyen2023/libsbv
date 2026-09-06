@@ -1,4 +1,5 @@
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_pid.h"
 
 void
@@ -10,7 +11,7 @@ sbv_pid_init (sbv_pid_t *pid, float max_output, float min_output,
 
     if (max_output <= min_output)
     {
-        /* Log */
+        LOG_ERROR ("Invalid input, max output %.2f < min output %.2f", max_output, min_output);
         return;
     }
 

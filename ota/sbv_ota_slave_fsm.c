@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_cqbuff.h"
 #include "sbv_ota_common.h"
@@ -90,7 +91,7 @@ sbv_ota_slave_fsm_fw_installer_tasks_process (void) {
     for (uint8_t i = 0; i < 3; ++i) {
         ret = (sbv_ota_slave_fw_installer_tasks[i])();
         if (ret != SBV_OK) {
-            // LOG
+            LOG_ERROR ("Failed to process fw installer task %u, aborting the process", i);
             return ret;
         }
     }
@@ -116,7 +117,7 @@ sbv_ota_slave_fsm_init (void* param)
 
     ipc = (sbv_ota_ipc_t *)param;
     if (! ipc) {
-        // LOG
+        LOG_ERROR ("Invalid input, OTA IPC queue is nil");
         return;
     }
 
@@ -124,6 +125,8 @@ sbv_ota_slave_fsm_init (void* param)
     sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue   = ipc->to_installer;
 
     sbv_rtos_mutex_create (sbv_ota_msg_slave_handler.mu);
+
+    LOG_INFO ("Initializating the OTA Slave FSM task ...");
 
     sbv_rtos_task_create(sbv_task_ota_update_fw_slave, "ota_slave", STACK_SIZE_BASE * 4,
                          NULL, SBV_OTA_SLAVE_FSM_PRIORITY, sbv_ota_slave_fsm_stack, &sbv_ota_slave_handle);
@@ -138,6 +141,8 @@ sbv_ota_slave_fsm_reset (void)
     sbv_ota_msg_slave_handler.is_update_enable  = SBV_TRUE;
 
     sbv_cqbuff_flush (sbv_ota_msg_slave_handler.data_queue);
+
+    LOG_INFO ("Resetting the OTA Slave FSM task stack...");
 }
 
 static uint8_t
@@ -175,7 +180,8 @@ sbv_ota_slave_fsm_get_next_state (void) {
 void
 sbv_task_ota_update_fw_slave (void* param)
 {
-    // LOG
+    LOG_INFO ("OTA Slave FSM task is starting up...");
+
     for(;;)
     {
         sbv_ota_slave_fsm_handle_state (NULL);
@@ -192,7 +198,7 @@ void sbv_ota_slave_fsm_handle_state (void *data)
     next_state    = sbv_ota_slave_fsm_get_next_state();
 
     if (! sbv_ota_slave_fsm_is_update_enable ()) {
-        // LOG
+        LOG_ERROR ("OTA update is disabled, aborting to run OTA Slave FSM process");
         sbv_rtos_mutex_unlock (sbv_ota_msg_slave_handler.mu);
 
         sbv_rtos_task_delay (SBV_RTOS_MAX_DELAY);
@@ -200,7 +206,6 @@ void sbv_ota_slave_fsm_handle_state (void *data)
     }
 
     if (next_state == SBV_OTA_STATE_IDLE) {
-        // LOG
         sbv_ota_slave_fsm_reset ();
         sbv_rtos_mutex_unlock (sbv_ota_msg_slave_handler.mu);
         return;
@@ -224,7 +229,7 @@ sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeo
 
     slave_handler = (sbv_ota_msg_slave_handler_t *)param;
     if (! slave_handler) {
-        // LOG
+        LOG_ERROR ("Nil OTA Slave FSM handler, aborting handle cmd packet process");
         return -1;
     }
 
@@ -232,13 +237,13 @@ sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeo
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv SBV OTA packet header, aborting handle cmd packet process");
         return ret;
     }
 
     ret = sbv_ota_packet_header_validate (&(cmd_pkt.h), SBV_OTA_PACKET_TYPE_CMD);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate SBV OTA packet header, aborting handle cmd packet process");
         return ret;
     }
 
@@ -246,13 +251,13 @@ sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeo
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     cmd_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv packet content, aborting handle cmd packet process");
         return ret;
     }
 
     ret = sbv_ota_msg_rx_cmd_packet_validate (&cmd_pkt, cmd_type, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate packet content, aborting handle cmd packet process");
         return ret;
     }
 
@@ -270,7 +275,7 @@ sbv_ota_slave_fsm_handle_header(void *param, uint32_t timeout_ms)
 
     slave_handler = (sbv_ota_msg_slave_handler_t *)param;
     if (! slave_handler) {
-        // LOG
+        LOG_ERROR ("Nil OTA Slave FSM handler, aborting handle header packet process");
         return -1;
     }
     
@@ -278,13 +283,13 @@ sbv_ota_slave_fsm_handle_header(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv SBV OTA packet header, aborting handle header packet process");
         return ret;
     }
 
     ret = sbv_ota_packet_header_validate (&(header_pkt.h), SBV_OTA_PACKET_TYPE_HEADER);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate SBV OTA packet header, aborting handle header packet process");
         return ret;
     }
 
@@ -292,13 +297,13 @@ sbv_ota_slave_fsm_handle_header(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     header_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv packet content, aborting handle header packet process");
         return ret;
     }
 
     ret = sbv_ota_msg_rx_header_packet_validate (&header_pkt, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate packet content, aborting handle header packet process");
         return ret;
     }
 
@@ -325,7 +330,7 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
 
     slave_handler = (sbv_ota_msg_slave_handler_t *)param;
     if (! slave_handler) {
-        // LOG
+        LOG_ERROR ("Nil OTA Slave FSM handler, aborting handle data packet process");
         return -1;
     }
 
@@ -336,25 +341,26 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv SBV OTA packet header, aborting handle data packet process");
         return ret;
     }
 
     ret = sbv_ota_packet_header_validate (&(common_header), SBV_OTA_PACKET_TYPE_DATA);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate SBV OTA packet header, aborting handle data packet process");
         return ret;
     }
 
     if (common_header.length > rcv_data_size) {
-        // LOG
+        LOG_ERROR ("SBV OTA data packet length %u is larger than expected length %u, aborting handle data packet process",
+                   common_header.length, rcv_data_size);
         return SBV_ERROR;
     }
 
     total_pkt_len = common_header.length + sizeof(sbv_ota_data_pkt_t);
     data_pkt = sbv_rtos_malloc(total_pkt_len);
     if (! data_pkt) {
-        // LOG
+        LOG_ERROR ("Failed to allocate memory for SBV OTA data packet");
         return SBV_ERROR;
     }
 
@@ -364,13 +370,13 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_SLAVE_RCV_BUFFER_SIZE,
                                     data_pkt->h.length, timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv packet content, aborting handle data packet process");
         goto ERR_EXIT;
     }
 
     ret = sbv_ota_msg_rx_data_packet_validate (data_pkt, total_pkt_len, &(slave_handler->peer_seq_num));
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate data content, aborting handle cmd packet process");
         goto ERR_EXIT;
     }
 
@@ -381,7 +387,8 @@ sbv_ota_slave_fsm_handle_data(void *param, uint32_t timeout_ms)
     slave_handler->current_rcv_image_size += common_header.length;
 
     if (slave_handler->current_rcv_image_size >= slave_handler->new_fw_metadata.fw_size) {
-        // LOG
+        LOG_INFO ("Received total %u bytes image, over the expected %u bytes",
+                  slave_handler->current_rcv_image_size, slave_handler->new_fw_metadata.fw_size);
         return SBV_OK;
     }
 
@@ -412,7 +419,11 @@ void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
 
     ret = sbv_ota_slave_fsm_handle_cmd(&sbv_ota_msg_slave_handler, SBV_OTA_CMD_START, SBV_OTA_BLOCKING_MAX_DELAY_MS);
     if (ret != SBV_OK) {
-        // LOG
+        if (ret == SVB_OTA_SEQ_DUP) {
+            LOG_WARN ("Received duplication cmd start packet, sending ACK to OTA Master FSM");
+        } else {
+            LOG_ERROR ("Failed to handle cmd start packet, sending NACK to OTA Master FSM");
+        }
     }
 
     sbv_ota_msg_slave_handler.is_updating = SBV_TRUE;
@@ -423,7 +434,7 @@ void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        /* LOG */
+        LOG_ERROR ("Failed to send response packet to OTA Master FSM");
     }
 
     sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE (SBV_OTA_STATE_HEADER, ret, resp_type);
@@ -445,7 +456,11 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
 
     ret = sbv_ota_slave_fsm_handle_header (&sbv_ota_msg_slave_handler, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        /* LOG */
+        if (ret == SVB_OTA_SEQ_DUP) {
+            LOG_WARN ("Received duplication header packet, sending ACK to OTA Master FSM");
+        } else {
+            LOG_ERROR ("Failed to handle header packet, sending NACK to OTA Master FSM");
+        }
     }
 
     resp_type = (ret == SBV_OK || ret == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
@@ -454,7 +469,7 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
 
     ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        /* LOG */
+        LOG_ERROR ("Failed to send response packet to OTA Master FSM");
     }
 
     sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE (SBV_OTA_STATE_DATA, ret, resp_type);
@@ -484,7 +499,11 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
     do {
         ret1 = sbv_ota_slave_fsm_handle_data (&sbv_ota_msg_slave_handler, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
         if (ret1 != SBV_BUSY && ret1 != SBV_OK) {
-            // LOG
+            if (ret1 == SVB_OTA_SEQ_DUP) {
+                LOG_WARN ("Received duplication data packet, sending ACK to OTA Master FSM");
+            } else {
+                LOG_ERROR ("Failed to handle data packet, sending NACK to OTA Master FSM");
+            }
         }
 
         resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
@@ -494,7 +513,7 @@ void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
         ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
         if (ret2 != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to send response packet to OTA Master FSM");
         }
 
         // Not yet receive all the firmware image, stay at the current DATA state
@@ -519,20 +538,24 @@ void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
 
     ret = sbv_ota_slave_fsm_handle_cmd(&sbv_ota_msg_slave_handler, SBV_OTA_CMD_END, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        // LOG
+        if (ret == SVB_OTA_SEQ_DUP) {
+            LOG_WARN ("Received duplication cmd end packet, sending ACK to OTA Master FSM");
+        } else {
+            LOG_ERROR ("Failed to handle cmd end packet, sending NACK to OTA Master FSM");
+        }
         goto SEND_REPORT;
     }
 
     // Verify the whole image hash CRC
     if (sbv_ota_slave_validate_rcv_fw_image_crc () != SBV_TRUE) {
-        // LOG
+        LOG_ERROR ("Failed to validate fw image CRC, aborting fw update process");
         ret = SBV_ERROR;
         goto SEND_REPORT;
     }
 
     ret = sbv_ota_slave_fsm_fw_installer_tasks_process ();
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to process fw installer control task process");
     }
 
 SEND_REPORT:
@@ -544,7 +567,7 @@ SEND_REPORT:
                                    &(sbv_ota_msg_slave_handler.new_fw_metadata),
                                    SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to send report packet to OTA Master FSM");
     }
 
     sbv_ota_msg_slave_handler.next_state  = SBV_OTA_STATE_IDLE;
@@ -574,13 +597,13 @@ sbv_ota_rcv_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_t* sys
     sbv_rtos_base_type_t status;
 
     if (system_msg == NULL) {
-        // LOG
+        LOG_ERROR ("Rcv empty system message from fw installer task, no further processing");
         return -1;
     }
 
     status = sbv_rtos_queue_rcv (queue, system_msg, sbv_rtos_ms_to_tick (timeout_ms));
     if (status != SBV_RTOS_TRUE) {
-        // LOG
+        LOG_ERROR ("Failed to rcv system message from fw installer task");
         return -1;
     }
 
@@ -597,20 +620,20 @@ sbv_ota_slave_fsm_system_msg_handle (void) {
     ret = sbv_ota_rcv_system_msg (sbv_ota_msg_slave_handler.slave_rx_installer_tx_queue,
                                   &system_msg, SBV_OTA_SLAVE_SYSTEM_MSG_RX_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to rcv system message from fw installer task, abort system msg handling");
         return ret;
     }
 
     switch (system_msg.event)
     {
     case SBV_OTA_EVENT_ACK:
-        // LOG
+        LOG_DEBUG ("Rcv system msg ACK from fw installer task");
         return SBV_OK;
     case SBV_OTA_EVENT_ABORT:
-        // LOG
+        LOG_DEBUG ("Rcv system msg ABORT from fw installer task");
         return SBV_ERROR;
     default:
-        // LOG
+        LOG_DEBUG ("Rcv unknown system msg from fw installer task, event=%u", system_msg.event);
         return SBV_ERROR;
     }
 }
@@ -623,13 +646,13 @@ sbv_ota_slave_fsm_start_fw_update (void) {
                                             &(sbv_ota_msg_slave_handler.new_fw_metadata),
                                             SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to send system msg start update process request to fw installer task");
         return ret;
     }
 
     ret = sbv_ota_slave_fsm_system_msg_handle ();
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to handle the response message from fw installer task");
         return ret;
     }
 
@@ -644,13 +667,13 @@ sbv_ota_slave_fsm_send_img_to_installer (void) {
                                                sbv_ota_msg_slave_handler.fw_image,
                                                SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to send system msg write fw image request to fw installer task");
         return ret;
     }
 
     ret = sbv_ota_slave_fsm_system_msg_handle ();
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to handle the response message from fw installer task");
         return ret;
     }
 
@@ -664,13 +687,13 @@ sbv_ota_slave_fsm_stop_fw_update (void) {
     ret = sbv_ota_send_system_msg_udp_finalize (sbv_ota_msg_slave_handler.slave_tx_installer_rx_queue,
                                                 SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to send system msg finalize update process request to fw installer task");
         return ret;
     }
 
     ret = sbv_ota_slave_fsm_system_msg_handle ();
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to handle the response message from fw installer task");
         return ret;
     }
 

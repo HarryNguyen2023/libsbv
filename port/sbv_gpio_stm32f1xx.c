@@ -1,3 +1,5 @@
+#include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_gpio_stm32f1xx.h"
 #ifdef STM32F1xx
@@ -6,8 +8,10 @@ sbv_gpio_stm32f1xx_init (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_num, 
 {
     sbv_gpio_init_type_def gpio_init = {0};
 
-    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX)
+    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX) {
+        LOG_ERROR ("Invalid GPIO input, GPIO number %u", gpio_num);
         return;
+    }
 
     if(gpio_type == SBV_GPIO_A)
         SBV_GPIO_CLOCK_A_ENABLE();
@@ -36,8 +40,10 @@ sbv_gpio_stm32f1xx_init (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_num, 
 void
 sbv_gpio_stm32f1xx_set_pin_level (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_num, sbv_gpio_pin_state_t pin_state)
 {
-    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX)
+    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX) {
+        LOG_ERROR ("Invalid GPIO input, GPIO number %u", gpio_num);
         return;
+    }
 
     HAL_GPIO_WritePin(gpio_type, gpio_num, pin_state);
 }
@@ -45,8 +51,10 @@ sbv_gpio_stm32f1xx_set_pin_level (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t g
 uint8_t
 sbv_gpio_stm32f1xx_read_pin (sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_num)
 {
-    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX)
+    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX) {
+        LOG_ERROR ("Invalid GPIO input, GPIO number %u", gpio_num);
         return 2;
+    }
 
     return HAL_GPIO_ReadPin (gpio_type, gpio_num);
 }
@@ -56,8 +64,10 @@ sbv_gpio_stm32f1xx_toggle_pin(sbv_gpio_type_def *gpio_type, sbv_gpio_num_t gpio_
 {
     sbv_rtos_tick_type_t delay_tick = sbv_rtos_ms_to_tick(delay_ms);
 
-    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX)
+    if (! gpio_type || gpio_num >= SBV_GPIO_NUM_MAX) {
+        LOG_ERROR ("Invalid GPIO input, GPIO number %u", gpio_num);
         return;
+    }
 
     HAL_GPIO_TogglePin (gpio_type, gpio_num);
     if (delay_ms)

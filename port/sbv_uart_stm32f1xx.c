@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
+
+#include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_uart.h"
 #include "sbv_uart_stm32f1xx.h"
@@ -82,7 +85,7 @@ sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* 
 
     if (sbv_uart_stm32f1xx_add_instance_to_list (uart_instance) != SBV_OK)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to add new UART instance to list");
         return SBV_ERROR;
     }
 
@@ -91,7 +94,7 @@ sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* 
     uart_instance->uart_rx_buffer         = sbv_cqbuff_create (SBV_UART_RX_BUFFER_SIZE, sizeof (uint8_t));
     if (! uart_instance->uart_rx_buffer)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to allocate memory for UART RX circular buffer");
         return SBV_ERROR;
     }
 
@@ -165,7 +168,7 @@ sbv_uart_stm32f1xx_rx_hw_callback(sbv_uart_handle_t* uart_handle, uint16_t uart_
     uart_instance = sbv_uart_stm32f1xx_get_instance_by_handle (uart_handle);
     if (! uart_instance)
     {
-        /* LOG */
+        // LOG_ERROR ("Failed to look up for the UART instance from the list");
         return;
     }
 
@@ -226,6 +229,8 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
         SBV_UART_MUTEX_UNLOCK (uart_instance);
         return 0;
     }
+
+    LOG_DEBUG ("Receive %u bytes over UART instance ", rx_buffer_size);
 
     if (uart_instance->uart_rx_cb)
     {

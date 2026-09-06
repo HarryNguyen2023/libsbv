@@ -3,6 +3,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_cqbuff.h"
 
@@ -16,7 +18,7 @@ sbv_cqbuff *sbv_cqbuff_create (int capacity, int element_size)
   new_buf = (sbv_cqbuff *)sbv_rtos_malloc(sizeof (sbv_cqbuff) + capacity);
   if (! new_buf)
   {
-    /* LOG */
+    LOG_ERROR ("Failed to allocate memory for circular buffer");
     return NULL;
   }
 
@@ -32,7 +34,7 @@ void sbv_cqbuff_delete (sbv_cqbuff* buff)
 {
   if (! buff)
     return;
-  
+
   sbv_rtos_free (buff);
   return;
 }
@@ -83,8 +85,10 @@ int sbv_cqbuff_write (sbv_cqbuff* buff, unsigned char* data, int element_num)
   if (!buff || !data || !element_num)
     return 0;
 
-  if (sbv_cqbuff_is_full (buff))
+  if (sbv_cqbuff_is_full (buff)) {
+    LOG_WARN ("Circular buffer is already full, failed to write!");
     return 0;
+  }
 
   avail_size = sbv_cqbuff_avail_size (buff);
   if (avail_size < buff->element_size)
@@ -119,8 +123,10 @@ int sbv_cqbuff_read (sbv_cqbuff* buff, unsigned char* data, int element_num)
   if (!buff || !data || !element_num)
     return 0;
 
-  if (sbv_cqbuff_is_empty (buff))
+  if (sbv_cqbuff_is_empty (buff)) {
+    LOG_WARN ("Circular buffer is already empty, nothing to read!");
     return 0;
+  }
 
   avail_size = buff->capacity - sbv_cqbuff_avail_size (buff);
   if (avail_size < buff->element_size)
@@ -154,9 +160,11 @@ void sbv_cqbuff_dump (sbv_cqbuff *buff, void (*sbv_cqbuff_element_print)(void *)
 
   if (sbv_cqbuff_is_empty (buff))
   {
+    LOG_WARN ("Circular buffer is already empty, nothing to dump!");
     return;
   }
-  printf ("Circular buffer: ");
+
+  LOG_INFO("Circular buffer: ");
 
   i = buff->rear;
   do {
@@ -166,7 +174,7 @@ void sbv_cqbuff_dump (sbv_cqbuff *buff, void (*sbv_cqbuff_element_print)(void *)
     count += buff->element_size;
   } while (i != buff->head && count < buff->capacity);
 
-  printf ("\n");
+  LOG_INFO("\n");
 }
 
 void sbv_cqbuff_flush (sbv_cqbuff *buff)

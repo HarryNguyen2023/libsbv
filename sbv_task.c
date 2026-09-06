@@ -5,16 +5,17 @@
 #include "sbv.h"
 #include "sbv_rtos.h"
 #include "sbv_system.h"
+#include "sbv_log.h"
 #include "sbv_cqbuff.h"
 #include "sbv_task.h"
 #include "sbv_can.h"
 #include "sbv_uart.h"
 #include "sbv_debug.h"
-#include "sbv_ota_common.h"
-#include "sbv_ota.h"
-#include "sbv_ota_msg.h"
-#include "sbv_ota_slave_fsm.h"
-#include "sbv_ota_master_fsm.h"
+// #include "sbv_ota_common.h"
+// #include "sbv_ota.h"
+// #include "sbv_ota_msg.h"
+// #include "sbv_ota_slave_fsm.h"
+// #include "sbv_ota_master_fsm.h"
 #include "sbv_pid.h"
 #include "sbv_gpio.h"
 #include "sbv_motor.h"
@@ -46,13 +47,13 @@ sbv_uart_instance_t          sbv_uart_1 = {0};
 extern sbv_can_handle_t     hcan;
 sbv_can_instance_t          sbv_can_instance;
 
-sbv_ota_ipc_t   sbv_ota_queues;
+// sbv_ota_ipc_t   sbv_ota_queues;
 
 void sbv_led_init_blink (void);
 void sbv_task_init(void);
 void sbv_task_balance_control(void *param);
 void sbv_task_debug_console_task(void *param);
-void sbv_task_ota_init (uint8_t is_master);
+// void sbv_task_ota_init (uint8_t is_master);
 
 void
 sbv_default_init_task (void *param) {
@@ -72,7 +73,7 @@ sbv_default_init_task (void *param) {
     /* Blink LED and wait for hardware system to stablize before starting software tasks */
     sbv_led_init_blink();
 
-    sbv_task_ota_init (SBV_FALSE);
+    // sbv_task_ota_init (SBV_FALSE);
 
     sbv_task_init();
 
@@ -101,11 +102,15 @@ sbv_led_init_blink (void)
 void
 sbv_task_init(void)
 {
+    LOG_INFO ("SBV system starting up... !");
+
     sbv_rtos_task_create(sbv_task_debug_console_task, "debug", STACK_SIZE_BASE,
                         NULL, 2, debug_stack, &sbv_debug_handle);
 
     sbv_rtos_task_create(sbv_task_balance_control, "balance_ctrl", STACK_SIZE_BASE * 4,
                         NULL, 4, balance_crtl_stack, &sbv_balance_ctrl_handle);
+
+    LOG_INFO ("SBV system has finished inialization!");
 }
 
 /*
@@ -121,6 +126,8 @@ sbv_task_balance_control(void *param)
     balance_update_period_ticks = sbv_rtos_ms_to_tick(sbv_control_balance_get_balance_sampling_time_ms(&sbv_control_balance));
     /* Delay between speed/twist updates follows the steering PID sampling period. */
     speed_update_delay_ticks = sbv_rtos_ms_to_tick(sbv_control_balance_get_speed_sampling_time_ms(&sbv_control_balance));
+
+    LOG_INFO ("SBV task balance control starting up... !");
 
     for(;;)
     {
@@ -159,6 +166,9 @@ sbv_task_debug_console_task(void *param)
     /* Register callback function to handle UART rx */
     sbv_debug_set_uart_interface (&sbv_uart_1);
 
+    LOG_INFO ("SBV task debug console starting up... !");
+
+
     for(;;)
     {
         // Check for UART reception new message
@@ -175,20 +185,20 @@ sbv_task_debug_console_task(void *param)
     }
 }
 
-void
-sbv_task_ota_init (uint8_t is_master) {
-    int ret;
+// void
+// sbv_task_ota_init (uint8_t is_master) {
+//     int ret;
 
-    ret = sbv_ota_ipc_queue_init (&sbv_ota_queues);
-    if (ret != SBV_OK) {
-        // LOG
-        return;
-    }
+//     ret = sbv_ota_ipc_queue_init (&sbv_ota_queues);
+//     if (ret != SBV_OK) {
+//         // LOG
+//         return;
+//     }
 
-    sbv_ota_update_init (&sbv_ota_queues);
-    sbv_ota_slave_fsm_init (&sbv_ota_queues);
+//     sbv_ota_update_init (&sbv_ota_queues);
+//     sbv_ota_slave_fsm_init (&sbv_ota_queues);
 
-    if (is_master) {
-        sbv_ota_master_fsm_init ();
-    }
-}
+//     if (is_master) {
+//         sbv_ota_master_fsm_init ();
+//     }
+// }

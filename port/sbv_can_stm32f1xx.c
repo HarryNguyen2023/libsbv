@@ -1,4 +1,7 @@
 #include <string.h>
+
+#include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_cqbuff.h"
 #include "sbv_can.h"
@@ -107,7 +110,7 @@ sbv_can_stm32f1xx_init(sbv_can_instance_t *can_instance,
 
     if (sbv_can_stm32f1xx_add_instance_to_list (can_instance) != SBV_OK)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to add new CAN instance to list");
         return;
     }
 
@@ -241,12 +244,15 @@ sbv_can_stm32f1xx_send_data(sbv_can_instance_t *can_instance,
         total_tx_bytes += cur_tx_bytes;
     }
 
+    LOG_DEBUG ("Write %u bytes via CAN TX, retry number %u", total_tx_bytes, try_num);
+
     return total_tx_bytes;
 }
 
 void
 sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
 {
+    int ret;
     sbv_can_instance_t *can_instance = NULL;
     sbv_rtos_base_type_t xHigherPriorityTaskWoken = SBV_RTOS_FALSE;
     sbv_can_rx_pkt_t can_rx_packet;
@@ -256,13 +262,17 @@ sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
     can_instance = sbv_can_stm32f1xx_get_instance_by_handle (can_hanlde);
     if (can_instance == NULL)
     {
-        // LOG
+        // LOG_ERROR ("Failed to lookup for the CAN instance from the list");
         return;
     }
 
-    HAL_CAN_GetRxMessage(can_hanlde, CAN_RX_FIFO1,
-                         &(can_rx_packet.sbv_can_header),
-                         can_rx_packet.sbv_can_data);
+    ret = HAL_CAN_GetRxMessage (can_hanlde, CAN_RX_FIFO1,
+                                &(can_rx_packet.sbv_can_header),
+                                can_rx_packet.sbv_can_data);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to read new CAN packet inside of interrupt cb");
+        return;
+    }
 
     if (can_instance->can_rcv_buf)
     {
@@ -303,6 +313,8 @@ sbv_can_stm32f1xx_rcv_data (sbv_can_instance_t *can_instance,
     rx_buffer_size = sbv_cqbuff_get_size (can_instance->can_rcv_buf);
     if (rx_buffer_size == 0)
         return 0;
+
+    LOG_DEBUG ("Received %u bytes via CAN RX", rx_buffer_size);
 
     rx_buffer_size = (rx_buffer_size < buffer_length) ? rx_buffer_size : buffer_length;
     rx_buffer_size = sbv_cqbuff_read (can_instance->can_rcv_buf,

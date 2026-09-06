@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_gpio.h"
 #include "sbv_system.h"
@@ -27,7 +28,7 @@ sbv_ota_installer_t sbv_ota_installer;
 int
 sbv_ota_ipc_queue_init (sbv_ota_ipc_t *ipc) {
     if (! ipc) {
-        // LOG
+        LOG_ERROR ("Invlaid input: OTA IPC queue is nil");
         return SBV_ERROR;
     }
 
@@ -52,13 +53,15 @@ sbv_ota_update_init(void *param)
 
     ipc = (sbv_ota_ipc_t *)param;
     if (! ipc) {
-        // LOG
+        LOG_ERROR ("Invlaid input: OTA IPC queue is nil");
         return;
     }
     sbv_ota_installer.rx_queue = ipc->to_installer;
     sbv_ota_installer.tx_queue = ipc->to_slave_fsm;
 
     sbv_rtos_mutex_create (sbv_ota_installer.mutex);
+
+    LOG_INFO ("Initializing OTA fw installer task...");
 
     sbv_rtos_task_create(sbv_ota_update_fw_thread, "update_fw", STACK_SIZE_BASE * 4,
                          NULL, SBV_OTA_UPDATE_FW_PRIO, sbv_ota_fw_update_stack, &sbv_ota_update_fw_handle);
@@ -116,6 +119,8 @@ sbv_ota_send_system_msg_abort (sbv_rtos_queue_handle_t queue, uint16_t timeout_m
 void
 sbv_ota_abort_fw_update (void)
 {
+    LOG_INFO ("Aborting OTA fw installer process...");
+
     sbv_rtos_mutex_lock(sbv_ota_installer.mutex);
 
     // Reset the state of the rx instance
@@ -132,6 +137,8 @@ sbv_ota_abort_fw_update (void)
     sbv_ota_send_system_msg_abort(sbv_ota_installer.tx_queue, SBV_OTA_MSG_QUEUE_TX_TIMEOUT_MS);
 
     sbv_rtos_mutex_unlock(sbv_ota_installer.mutex);
+
+    LOG_DEBUG ("Send OTA abort message to Slave FSM task");
 }
 
 int
@@ -142,14 +149,14 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
 
     if (! sbv_ota_is_valid_fw_slot (image_slot) || slot_metadata == NULL)
     {
-        // LOG
+        LOG_ERROR ("Invalid OTA image slot %u", image_slot);
         return -1;
     }
 
     /* Read the configuration in flash memory space */
     ret = sbv_ota_cfg_read_and_validate (&cfg);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Invalid OTA configuration read");
         return -1;
     }
 
@@ -173,7 +180,7 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
     ret = sbv_ota_cfg_commit (&cfg);
     if (ret != SBV_OK)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to commit new OTA configuration data");
         return -1;
     }
 
@@ -192,7 +199,7 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
         return SBV_ERROR;
 
     if (! sbv_ota_is_updating ()) {
-        // LOG
+        LOG_ERROR ("OTA fw installer is not updating, abort validate fw metadata");
         return SBV_ERROR;
     }
 
@@ -200,21 +207,23 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
     // to avoid the firmware overload attack
     if (fw_metadata->fw_size == 0 || fw_metadata->fw_size > SBV_OTA_SLOT_MAX_SIZE)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid fw metadata size %u, maximum allowable size %u, abort validate fw metadata",
+                   fw_metadata->fw_size, SBV_OTA_SLOT_MAX_SIZE);
         return SBV_ERROR;
     }
 
     ret = sbv_ota_get_current_fw_metadata (&current_fw_metadata);
     if (ret != 0)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to get the current fw metadata on Flash, abort validate fw metadata");
         return SBV_ERROR;
     }
 
     // Compare firmware timestampt to avoid old firmware or future enforcement attack
     cmp_timestampt = memcmp ((fw_metadata->fw_timestamp), (current_fw_metadata.fw_timestamp), SBV_OTA_FW_TIME_LENGTH);
     if (cmp_timestampt < 0) {
-        // LOG
+        LOG_ERROR ("New metadata timestampt %s is older than current one %s, abort validate fw metadata",
+                    fw_metadata->fw_timestamp, current_fw_metadata.fw_timestamp);
         return SBV_ERROR;
     }
     // TODO: check the new fw timestampt with current system time
@@ -222,20 +231,21 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
     /* Check if the on going fw has the same metadata or not, to continue the process */
     if (sbv_ota_fw_version_decode (fw_metadata->fw_version, &new_ver) != SBV_TRUE
         || sbv_ota_fw_version_decode (current_fw_metadata.fw_version, &current_ver) != SBV_TRUE) {
-        // LOG
+        LOG_ERROR ("Failed to decode fw version format, abort validate fw metadata");
         return SBV_ERROR;
     }
 
     cmp_version = sbv_ota_fw_version_compare (&new_ver, &current_ver);
     if (cmp_version == 0)
     {
-        /* LOG */
+        LOG_INFO ("Current fw version has been the most up-to-date, abort validate fw metadata");
         return SBV_ERROR;
     }
     // Avoid firmware rollback attack
     else if (cmp_version < 0)
     {
-        /* LOG */
+        LOG_ERROR ("New metadata version %s is older than current one %s, abort validate fw metadata",
+                  fw_metadata->fw_version, current_fw_metadata.fw_version);
         return SBV_ERROR;
     }
     else
@@ -244,7 +254,7 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
         *inactive_slot = sbv_ota_get_available_slot_num ();
         if (*inactive_slot == SBV_OTA_INVALID_SLOT)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to get available image slot, abort validate fw metadata");
             return SBV_ERROR;
         }
 
@@ -252,7 +262,7 @@ sbv_ota_fw_metadata_validate (sbv_ota_fw_metadata_t *fw_metadata,
         ret = sbv_ota_erase_flash_data (*slot_pag_add, SBV_OTA_FW_SLOT_PAGES);
         if (ret != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to erase Flash image slot %x, abort validate fw metadata", *slot_pag_add);
             return SBV_ERROR;
         }
     }
@@ -272,17 +282,18 @@ sbv_ota_save_fw_image_to_flash (uint8_t *fw_img, const uint32_t fw_size, const u
     uint32_t curr_page_addr;
 
     if (! fw_img || fw_size == 0 || fw_size > SBV_OTA_SLOT_MAX_SIZE) {
-        // LOG
+        LOG_ERROR ("Invalid input of fw image, size %lu, maximum allowable size %lu, abort save fw image to FLASH",
+                  fw_size, SBV_OTA_SLOT_MAX_SIZE);
         return SBV_ERROR;
     }
 
     if (! sbv_ota_is_updating ()) {
-        // LOG
+        LOG_ERROR ("OTA fw installer is not updating, abort save fw image to FLASH");
         return SBV_ERROR;
     }
 
     if (! sbv_ota_is_valid_page_addr (slot_pag_addr)) {
-        // LOG
+        LOG_ERROR ("Invalid fw slot page addr %x, abort save fw image to FLASH", slot_pag_addr);
         return SBV_ERROR;
     }
 
@@ -297,13 +308,13 @@ sbv_ota_save_fw_image_to_flash (uint8_t *fw_img, const uint32_t fw_size, const u
         if (last_page_size && i == (page_num - 1)) {
             ret = sbv_ota_write_flash_data (curr_fw_img_head, last_page_size, curr_page_addr);
             if (ret != SBV_OK) {
-                // LOG
+                LOG_ERROR ("Failed to program %u bytes to addr %x, abort save fw image to FLASH", last_page_size, curr_page_addr);
                 return ret;
             }
         } else {
             ret = sbv_ota_write_flash_data (curr_fw_img_head, SBV_OTA_PAGES_SIZE, curr_page_addr);
             if (ret != SBV_OK) {
-                // LOG
+                LOG_ERROR ("Failed to program %u bytes to addr %x, abort save fw image to FLASH", SBV_OTA_PAGES_SIZE, curr_page_addr);
                 return ret;
             }
 
@@ -322,6 +333,8 @@ sbv_ota_system_reset (void)
 {
     sbv_ota_set_update_enable (SBV_FALSE);
 
+    LOG_INFO ("Resetting the system in the next %u ms ...", SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS);
+
     /* Reset the system after 10s */
     sbv_rtos_task_delay(sbv_rtos_ms_to_tick(SBV_OTA_LOAD_NEW_FW_APP_WAIT_MS));
 
@@ -335,20 +348,20 @@ sbv_ota_handle_final_upd (const uint32_t slot_pag_addr, const uint8_t inactive_s
     int ret, is_image_valid;
 
     if (! sbv_ota_is_updating ()) {
-        // LOG
+        LOG_ERROR ("OTA fw installer is not updating, abort finalize fw update process");
         return SBV_ERROR;
     }
 
     if (! sbv_ota_is_valid_page_addr (slot_pag_addr))
     {
-        // LOG
+        LOG_ERROR ("Invalid OTA slot page addr %x, abort finalize fw update process", slot_pag_addr);
         return SBV_ERROR;
     }
 
     is_image_valid = sbv_ota_fw_image_crc_validate (slot_pag_addr, fw_metadata);
     if (! is_image_valid)
     {
-        // LOG
+        LOG_ERROR ("Invalid OTA image CRC, abort finalize fw update process");
         return SBV_ERROR;
     }
 
@@ -356,7 +369,7 @@ sbv_ota_handle_final_upd (const uint32_t slot_pag_addr, const uint8_t inactive_s
     ret = sbv_ota_save_fw_img_cfg (inactive_slot, &fw_metadata, is_image_valid);
     if (ret != 0)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to save new fw metadata to FLASH, abort finalize fw update process");
         return SBV_ERROR;
     }
 
@@ -382,13 +395,13 @@ sbv_ota_process_update_fw_cmd (void)
     rcv_msg = (sbv_ota_system_msg_t *)(sbv_ota_installer.data);
     if (rcv_msg == NULL)
     {
-        // LOG
+        LOG_ERROR ("Empty OTA update process msg, no further processing");
         goto ERR_EXIT;
     }
 
     if (! sbv_ota_is_update_enable())
     {
-        // LOG
+        LOG_ERROR ("OTA update is disabled, no further processing OTA update msg");
         goto ERR_EXIT;
     }
 
@@ -405,7 +418,7 @@ sbv_ota_process_update_fw_cmd (void)
         ret = sbv_ota_fw_metadata_validate (&(sbv_ota_installer.fw_metadata), &slot_pag_add, &inactive_slot);
         if (ret != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to validate fw metadata, aborting the fw update process");
             goto ERR_EXIT;
         }
 
@@ -419,7 +432,7 @@ sbv_ota_process_update_fw_cmd (void)
                                               sbv_ota_installer.slot_pag_add);
         if (ret != SBV_OK)
         {
-            // LOG
+            LOG_ERROR ("Failed to save new fw image to FLASH, aborting the fw update process");
             goto ERR_EXIT;
         }
         break;
@@ -430,7 +443,7 @@ sbv_ota_process_update_fw_cmd (void)
                                         sbv_ota_installer.fw_metadata);
         if (ret != SBV_OK)
         {
-            // LOG
+            LOG_ERROR ("Failed to vfinalize the fw update process, aborting the fw update process");
             goto ERR_EXIT;
         }
         break;
@@ -462,6 +475,8 @@ sbv_ota_update_fw_thread (void *param)
     sbv_rtos_base_type_t status;
     sbv_rtos_tick_type_t tick_to_wait;
 
+    LOG_INFO ("OTA fw installer task is starting up...");
+
     for(;;)
     {
         // To protect against partial firmware update attack, we use a simple
@@ -474,7 +489,7 @@ sbv_ota_update_fw_thread (void *param)
         {
             if (sbv_ota_is_updating_locked())
             {
-                /* Watchdog timeout: no next OTA event arrived in time */
+                LOG_ERROR ("Watchdog timeout: rcv no new system msg from OTA slave FSM task, aborting the fw update process");
                 sbv_ota_abort_fw_update();
             }
         }
@@ -483,7 +498,7 @@ sbv_ota_update_fw_thread (void *param)
             ret = sbv_ota_process_update_fw_cmd();
             if (ret != SBV_OK)
             {
-                // LOG
+                LOG_ERROR ("Failed to process fw update cmd from Slave FSM task, aborting the fw update process");
                 sbv_ota_abort_fw_update();
             }
         }

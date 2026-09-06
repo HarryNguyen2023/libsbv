@@ -1,8 +1,6 @@
 #ifndef __SBV_GPIO_STM32F1XX_H__
 #define __SBV_GPIO_STM32F1XX_H__
 
-#include "sbv.h"
-
 #ifdef STM32F1xx
 
 #define SBV_GPIO_BUILT_IN_LED       GPIO_PIN_13

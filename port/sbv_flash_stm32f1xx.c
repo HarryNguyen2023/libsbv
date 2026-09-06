@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_flash_stm32f1xx.h"
 
 int
@@ -10,8 +11,10 @@ sbv_flash_stm32f1xx_erase_page(uint32_t page_addr, uint16_t pages_num)
     int ret = SBV_OK;
 
     ret = HAL_FLASH_Unlock();
-    if(ret != SBV_OK)
+    if(ret != SBV_OK) {
+        LOG_ERROR ("Failed to unlock the Flash system");
         return ret;
+    }
 
     FLASH_EraseInitTypeDef erase_init_struct;
     uint32_t erase_error;
@@ -20,9 +23,8 @@ sbv_flash_stm32f1xx_erase_page(uint32_t page_addr, uint16_t pages_num)
     erase_init_struct.PageAddress   = page_addr;
     erase_init_struct.NbPages       = pages_num;
     ret = HAL_FLASHEx_Erase(&erase_init_struct, &erase_error);
-    if (ret != SBV_OK)
-    {
-        // LOG
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to erase Flash page %x, offset %u", page_addr, pages_num);
     }
 
     HAL_FLASH_Lock();
@@ -41,8 +43,10 @@ sbv_flash_stm32f1xx_write_page (uint8_t *data, uint32_t data_length, uint32_t pa
         return SBV_ERROR;
 
     ret = HAL_FLASH_Unlock();
-    if(ret != SBV_OK)
+    if(ret != SBV_OK) {
+        LOG_ERROR ("Failed to unlock the Flash system");
         return ret;
+    }
 
     for(uint32_t i = 0; i < data_length; i += 2)
     {
@@ -50,6 +54,7 @@ sbv_flash_stm32f1xx_write_page (uint8_t *data, uint32_t data_length, uint32_t pa
         ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, ota_half_word_addr, halfword_data);
         if(ret != SBV_OK)
             goto EXIT_ERR;
+
         ota_half_word_addr += 2;
     }
 
@@ -57,7 +62,7 @@ sbv_flash_stm32f1xx_write_page (uint8_t *data, uint32_t data_length, uint32_t pa
     return SBV_OK;
 
 EXIT_ERR:
-    // LOG
+    LOG_ERROR ("Failed to program Flash at address %x", ota_half_word_addr);
     HAL_FLASH_Lock();
     return SBV_ERROR;
 }

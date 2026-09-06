@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
+
+#include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
 #include "sbv_i2c.h"
 #include "sbv_i2c_stm32f1xx.h"
@@ -63,7 +66,7 @@ sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t
 
     if (sbv_i2c_stm32f1xx_master_add_instance_to_list(i2c_instance) != SBV_OK)
     {
-        // LOG
+        LOG_ERROR ("Failed to add new I2C instance to list");
         return SBV_ERROR;
     }
 
@@ -125,7 +128,7 @@ sbv_i2c_stm32f1xx_rx_hw_callback(sbv_i2c_handle_t* i2c_handle)
     i2c_instance = sbv_i2c_stm32f1xx_master_get_instance_by_handle (i2c_handle);
     if (i2c_instance == NULL)
     {
-        // LOG
+        // LOG_ERROR ("Failed to get I2C instance from list");
         return;
     }
 
@@ -162,7 +165,7 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
                                     i2c_instance->i2c_rx_buffer, recv_size);
     if (ret != SBV_OK)
     {
-        // LOG
+        LOG_ERROR ("Failed to rcv %d bytes from I2C slave addr %x", recv_size, slave_add);
         SBV_I2C_RX_BUFFER_MUTEX_UNLOCK(i2c_instance);
         return SBV_ERROR;
     }
@@ -171,6 +174,8 @@ sbv_i2c_stm32f1xx_master_rcv_data (sbv_i2c_instance_t *i2c_instance, uint8_t sla
     if (notify == 0)
     {
         /* No notification is received after the timeout event */
+        LOG_WARN ("No I2C RX interrupt notification is received after timeout");
+
         i2c_instance->i2c_rx_notify_task = NULL;
         SBV_I2C_RX_BUFFER_MUTEX_UNLOCK(i2c_instance);
         return 0;
