@@ -11,9 +11,10 @@ extern sbv_uart_instance_t sbv_uart_1;
 #define SBV_LOG_BUFFER_SIZE  256
 #define SBV_LOG_TIMEOUT_MS   100
 
+static char buffer[SBV_LOG_BUFFER_SIZE];
+
 void sbv_log_printf(const char *format, ...)
 {
-    char buffer[SBV_LOG_BUFFER_SIZE];
     va_list args;
     int len;
 

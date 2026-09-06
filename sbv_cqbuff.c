@@ -44,7 +44,7 @@ int sbv_cqbuff_is_empty (sbv_cqbuff* buff)
   if (! buff)
     return 0;
 
-  return (buff->head == buff->rear);
+  return (buff->head == buff->rear || buff->head == -1);
 }
 
 int sbv_cqbuff_is_full (sbv_cqbuff* buff)
@@ -60,12 +60,12 @@ int sbv_cqbuff_avail_size (sbv_cqbuff* buff)
   if (!buff)
     return 0;
 
-  if (buff->head > buff->rear)
-    return (buff->capacity - (buff->head - buff->rear));
-  else if (buff->head < buff->rear)
-    return (buff->rear - buff->head);
-  else if (sbv_cqbuff_is_empty (buff))
+  if (sbv_cqbuff_is_empty (buff))
     return buff->capacity;
+  else if (buff->head > buff->rear)
+    return (buff->capacity - (buff->head - buff->rear));
+  else
+    return (buff->rear - buff->head);
 
   return 0;
 }

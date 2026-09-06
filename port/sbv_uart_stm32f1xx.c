@@ -138,18 +138,18 @@ sbv_uart_stm32f1xx_send_data(sbv_uart_instance_t* uart_instance, uint8_t* uart_t
     if(! uart_instance || ! uart_tx_data || uart_tx_size == 0)
         return SBV_ERROR;
 
-    SBV_UART_MUTEX_LOCK (uart_instance);
+    // SBV_UART_MUTEX_LOCK (uart_instance);
 
     ret = sbv_uart_stm32f1xx_tx_send_pkt(uart_instance->uart_handle,
                                          uart_tx_data, uart_tx_size, timeout_ms);
     if (ret != SBV_OK)
     {
         // LOG
-        SBV_UART_MUTEX_UNLOCK (uart_instance);
+        // SBV_UART_MUTEX_UNLOCK (uart_instance);
         return ret;
     }
 
-    SBV_UART_MUTEX_UNLOCK (uart_instance);
+    // SBV_UART_MUTEX_UNLOCK (uart_instance);
 
     return ret;
 }
@@ -230,7 +230,7 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
         return 0;
     }
 
-    LOG_DEBUG ("Receive %u bytes over UART instance ", rx_buffer_size);
+    LOG_DEBUG ("Receive %u bytes over UART instance", rx_buffer_size);
 
     if (uart_instance->uart_rx_cb)
     {

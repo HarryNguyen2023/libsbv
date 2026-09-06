@@ -2,6 +2,7 @@
 #include "string.h"
 
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_imu.h"
 #include "sbv_i2c.h"
 
@@ -38,7 +39,7 @@ sbv_imu_init (sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle,
     ret = sbv_mpu9250_init(i2c_instance, i2c_handle);
     if (ret != SBV_OK)
     {
-        // LOG
+        LOG_ERROR ("Failed to initiate the MPU9250 module");
         return ret;
     }
 #endif /*SBV_MPU9050*/
@@ -99,7 +100,7 @@ sbv_imu_kalman_update (sbv_imu_instance_t *imu_instance)
                             &(imu_instance->sbv_imu_acc));
     if (ret != SBV_OK)
     {
-        // LOG
+        LOG_ERROR ("Failed to read MPU9250 sensor data for Kalman Update process");
         return ret;
     }
 #endif /*SBV_MPU9050*/

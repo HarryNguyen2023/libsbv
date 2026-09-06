@@ -65,7 +65,7 @@ sbv_default_init_task (void *param) {
     sbv_uart_init(&sbv_uart_1, &huart1, &hdma_usart1_rx, SBV_UART_BAUDRATE_115200, uart_pin);
 
     /* CAN interface initialization */
-    // sbv_can_init(&sbv_can_instance, &hcan);
+    sbv_can_init(&sbv_can_instance, &hcan);
 
     /* Initialize the robot control system */
     sbv_control_balance_init(&sbv_control_balance, &sbv_imu_instance, &sbv_i2c_1, &hi2c1);
@@ -167,7 +167,6 @@ sbv_task_debug_console_task(void *param)
     sbv_debug_set_uart_interface (&sbv_uart_1);
 
     LOG_INFO ("SBV task debug console starting up... !");
-
 
     for(;;)
     {

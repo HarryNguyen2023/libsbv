@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_i2c.h"
 #include "sbv_imu.h"
 #include "sbv_mpu9250.h"
@@ -38,29 +39,51 @@ sbv_mpu9250_cfg_set(uint8_t reg, uint8_t data)
 int
 sbv_mpu9250_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
 {
+    int ret;
+
     if (!i2c_instance || ! i2c_handle)
         return SBV_ERROR;
 
-    sbv_i2c_master_init (i2c_instance, i2c_handle);
+    ret = sbv_i2c_master_init (i2c_instance, i2c_handle);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to initlaizae I2C master, abort MPU9250 init");
+        return ret;
+    }
+
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_PWR_MGMT_1, SBV_MPU9250_PWR_CONFIG);
-    sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    ret = sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
+                                   sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to send MPU9250 cfg for reg=%x", SBV_MPU9250_REG_PWR_MGMT_1);
+    }
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_CONFIG, SBV_MPU9250_GENERAL_CONFIG);
-    sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    ret = sbv_i2c_master_send_data (i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
+                                    sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to send MPU9250 cfg for reg=%x", SBV_MPU9250_REG_CONFIG);
+    }
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_GYRO_CONFIG, SBV_MPU9250_GYRO_CONFIG);
-    sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    ret = sbv_i2c_master_send_data (i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
+                                    sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to send MPU9250 cfg for reg=%x", SBV_MPU9250_REG_GYRO_CONFIG);
+    }
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_ACCEL_CONFIG, SBV_MPU9250_ACCEL_CONFIG);
-    sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    ret = sbv_i2c_master_send_data (i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
+                                    sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to send MPU9250 cfg for reg=%x", SBV_MPU9250_REG_ACCEL_CONFIG);
+    }
 
     sbv_mpu9250_cfg_set(SBV_MPU9250_REG_ACCEL_CONFIG_2, SBV_MPU9250_ACCEL_CONFIG_2);
-    sbv_i2c_master_send_data(i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
-                             sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    ret = sbv_i2c_master_send_data (i2c_instance, SBV_MPU9250_I2C_ADDR, SBV_I2C_MSG_WRITE,
+                                    sbv_mpu_cfg_buffer, SBV_MPU9250_CFG_MSG_SIZE, SBV_MPU9250_CFG_I2C_TIMEOUT);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to send MPU9250 cfg for reg=%x", SBV_MPU9250_REG_ACCEL_CONFIG_2);
+    }
 
     return SBV_OK;
 }
@@ -80,7 +103,8 @@ sbv_mpu9250_read_sensor(sbv_imu_gyroscope_t *gyro, sbv_imu_accelerometer_t *acce
 
     if (sbv_i2c_rx_size < SBV_MPU9250_RCV_MSG_SIZE)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to recv MPU9250 data, rcv %u bytes, expected %u bytes",
+                  sbv_i2c_rx_size, SBV_MPU9250_RCV_MSG_SIZE);
         return;
     }
 
@@ -123,7 +147,7 @@ sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
     /* Fail to request data from MPU9250 */
     if (try_num >= SBV_MPU_9250_MAX_WRITE_TRY)
     {
-        // LOG
+        LOG_ERROR ("Failed to send MPU9250 data read request");
         return SBV_ERROR;
     }
 
@@ -133,7 +157,7 @@ sbv_mpu9250_read(sbv_i2c_instance_t *i2c_instance,
                                         SBV_MPU9250_RCV_I2C_TIMEOUT);
     if (recv_byte <= 0)
     {
-        // LOG
+        LOG_ERROR ("Failed to recv MPU9250 sensor data");
         return SBV_ERROR;
     }
 
