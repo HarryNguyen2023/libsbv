@@ -3,6 +3,7 @@
 
 #include "sbv.h"
 #include "sbv_rtos.h"
+#include "sbv_log.h"
 #include "sbv_gpio.h"
 #include "sbv_system.h"
 #include "sbv_ota_common.h"
@@ -25,7 +26,7 @@ sbv_ota_get_available_fw_update_slot (void)
 	/* Read the configuration in flash memory space */
 	ret = sbv_ota_cfg_read_and_validate (&cfg);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Bootloader: Failed to read and validate the current OTA general config on Flash");
         return SBV_OTA_INVALID_SLOT;
     }
 
@@ -35,7 +36,7 @@ sbv_ota_get_available_fw_update_slot (void)
         data_slot = sbv_ota_get_update_slot(&cfg);
         if (data_slot == SBV_OTA_INVALID_SLOT)
         {
-            // LOG
+            LOG_ERROR ("Bootloader: Failed to get new updating fw slot");
             return SBV_OTA_INVALID_SLOT;
         }
 
@@ -62,10 +63,12 @@ sbv_ota_get_available_fw_update_slot (void)
                     cfg.slot_table[i].is_slot_update    = SBV_FALSE;
                 }
             }
+
+            LOG_INFO ("Bootloader: Booting new update image slot %u", data_slot);
         }
         else
         {
-            /* LOG */
+            LOG_ERROR ("Bootloader: New update image slot %u integrity is invalid, falling back to boot normal update slot", data_slot);
             for(uint8_t i = 0; i < SBV_OTA_SLOT_NO; ++i)
             {
                 if(i == data_slot)
@@ -84,7 +87,7 @@ FALL_BACK:
         data_slot = sbv_ota_get_active_slot (&cfg);
         if (data_slot == SBV_OTA_INVALID_SLOT)
         {
-            // LOG
+            LOG_ERROR ("Bootloader: Failed to get active fw slot");
             return SBV_OTA_INVALID_SLOT;
         }
 
@@ -106,7 +109,7 @@ FALL_BACK:
         ret = sbv_ota_cfg_commit (&cfg);
         if (ret != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Bootloader: Failed to commit new general config to Flash");
             return SBV_OTA_INVALID_SLOT;
         }
     }
@@ -117,6 +120,8 @@ FALL_BACK:
 static void
 sbv_ota_bootloader_goto_application (uint32_t slot_addr)
 {
+    LOG_INFO ("Bootloader: Booting to application addr %x", slot_addr);
+
     /* Set the function pointer to the start of the app memory address */
     void (*AppReset_Handler)(void) = (void*)(*((volatile uint32_t*)(slot_addr + 4U)));
 	if(AppReset_Handler == (void*)0xFFFFFFFF)
@@ -139,7 +144,6 @@ sbv_ota_bootloader_init_blink (void)
     }
 }
 
-
 void
 sbv_ota_bootloader_load_new_app (void)
 {
@@ -152,12 +156,12 @@ sbv_ota_bootloader_load_new_app (void)
     fw_slot = sbv_ota_get_available_fw_update_slot();
     if(fw_slot == SBV_OTA_INVALID_SLOT)
     {
-        /* LOG */
+        LOG_INFO ("Bootloader: Failed to get valid fw slot for booting, entering forever loop");
         /* Blink the LED each 500ms to indicate that both of the FW slot can not be used */
         while (1)
         {
             sbv_gpio_toggle_pin (SBV_GPIO_BUILT_IN_LED_TYPE, SBV_GPIO_BUILT_IN_LED, 0);
-            sbv_system_delay (500);
+            sbv_system_delay (2000);
         }
     }
 

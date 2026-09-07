@@ -36,14 +36,18 @@
 
 #define SVB_OTA_SEQ_DUP             (-3)
 
-#define SBV_OTA_UID_BASE            0x1FFFF7E8UL
-
 typedef struct sbv_ota_fw_version_t
 {
   uint8_t  major;   // A
   uint8_t  minor;   // B
   uint16_t build;   // CDEF
 } sbv_ota_fw_version_t;
+
+typedef enum sbv_ota_upd_status
+{
+	SBV_OTA_UPD_SUCCESS,
+  SBV_OTA_UDP_FAILED,
+} sbv_ota_upd_status;
 
 typedef struct sbv_ota_fw_metadata_t
 {
@@ -150,4 +154,6 @@ uint8_t
 sbv_ota_fw_version_decode(const char *str, sbv_ota_fw_version_t *ver);
 int
 sbv_ota_fw_version_compare(const sbv_ota_fw_version_t *v1, const sbv_ota_fw_version_t *v2);
+char *
+sbv_ota_Update_status_to_string (sbv_ota_upd_status status);
 #endif /* SBV_OTA_COMMON_H */

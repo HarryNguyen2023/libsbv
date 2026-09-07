@@ -4,6 +4,7 @@
 
 #include "sbv.h"
 #include "sbv_rtos.h"
+#include "sbv_log.h"
 #include "sbv_flash.h"
 #include "sbv_system.h"
 #include "sbv_ota_common.h"
@@ -35,7 +36,7 @@ sbv_ota_write_flash_data (uint8_t *data, uint32_t data_length, uint32_t page_add
     ret = sbv_flash_write_page(data, data_length, page_addr);
     if(ret != SBV_OK)
     {
-        // LOG
+        LOG_ERROR ("Failed to write page=%x with offset=%u to flash", page_addr, data_length);
         return ret;
     }
 
@@ -45,7 +46,7 @@ sbv_ota_write_flash_data (uint8_t *data, uint32_t data_length, uint32_t page_add
 void
 sbv_ota_cfg_read (sbv_ota_general_cfg_t *c) {
     if (! c) {
-        // LOG
+        LOG_ERROR ("Input OTA general config struct is nil");
         return;
     }
     memset (c, 0, sizeof (sbv_ota_general_cfg_t));
@@ -57,7 +58,7 @@ sbv_cfg_validate (const sbv_ota_general_cfg_t *c) {
     uint32_t metadata_crc, new_crc;
 
     if (c->magic != SBV_OTA_CONFIG_FLASH_ADD) {
-        // LOG
+        LOG_ERROR ("Invalid OTA general config, wrong magic number=%u, expected=%u", c->magic, SBV_OTA_CONFIG_FLASH_ADD);
         return SBV_ERROR;
     }
 
@@ -70,7 +71,7 @@ sbv_cfg_validate (const sbv_ota_general_cfg_t *c) {
 int
 sbv_ota_cfg_read_and_validate (sbv_ota_general_cfg_t *c) {
     if (! c) {
-        // LOG
+        LOG_ERROR ("Input OTA general config struct is nil");
         return -1;
     }
 
@@ -85,7 +86,7 @@ sbv_ota_cfg_commit(sbv_ota_general_cfg_t *c) {
     uint32_t metadata_crc;
 
     if (! c) {
-        // LOG
+        LOG_ERROR ("Input OTA general config struct is nil");
         return SBV_ERROR;
     }
 
@@ -96,14 +97,16 @@ sbv_ota_cfg_commit(sbv_ota_general_cfg_t *c) {
     ret = sbv_ota_erase_flash_data (SBV_OTA_CONFIG_FLASH_ADD, SBV_OTA_GEN_CFG_PAGES);
     if (ret != SBV_OK)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to erase %u pages of Flash from addr=%x for OTA general config",
+                    SBV_OTA_GEN_CFG_PAGES, SBV_OTA_CONFIG_FLASH_ADD);
         return SBV_ERROR;
     }
 
     ret = sbv_ota_write_flash_data((uint8_t *)c, sizeof(sbv_ota_general_cfg_t), SBV_OTA_CONFIG_FLASH_ADD);
     if (ret != SBV_OK)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to write %u bytes to Flash from addr=%x for OTA general config",
+                    sizeof(sbv_ota_general_cfg_t), SBV_OTA_CONFIG_FLASH_ADD);
         return SBV_ERROR;
     }
 
@@ -161,7 +164,7 @@ sbv_ota_get_available_slot_num (void)
     /* Read the configuration in flash memory space */
     ret = sbv_ota_cfg_read_and_validate (&cfg);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to read and validate the current OTA general config on Flash");
         return SBV_OTA_INVALID_SLOT;
     }
 
@@ -195,7 +198,7 @@ sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
     /* Read the configuration in flash memory space */
     ret = sbv_ota_cfg_read_and_validate (&cfg);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to read and validate the current OTA general config on Flash");
         return -1;
     }
 
@@ -278,12 +281,12 @@ sbv_ota_fw_image_crc_validate (const uint32_t page_addr, const sbv_ota_fw_metada
     const uint8_t *img;
 
     if (! sbv_ota_is_valid_page_addr(page_addr)) {
-        // LOG
+        LOG_ERROR ("Invalid OTA image page addr=%x", page_addr);
         return SBV_ERROR;
     }
 
     if (fw_metadata.fw_size == 0 || fw_metadata.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
-        // LOG
+        LOG_ERROR ("Invalid fw image size=%u, maximum allowable size=%u", fw_metadata.fw_size, SBV_OTA_SLOT_MAX_SIZE);
         return SBV_ERROR;
     }
 
@@ -319,7 +322,7 @@ sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event
     msg.data  = data;
     status = sbv_rtos_queue_send (queue, &msg, tick_to_wait);
     if (status != SBV_RTOS_TRUE) {
-        // LOG
+        LOG_ERROR ("Failed to send OTA system message, event=%u", event);
         return -1;
     }
 
@@ -351,7 +354,7 @@ sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t
     uint16_t expected_seq_num;
 
     if (! curr_seq_num) {
-        // LOG
+        LOG_ERROR ("Invalid input: current sequence number is nil");
         return SBV_ERROR;
     }
 
@@ -363,7 +366,7 @@ sbv_ota_seq_num_validate (uint16_t* curr_seq_num, uint16_t new_seq_num, uint16_t
     }
     
     if (new_seq_num == *curr_seq_num) {
-        // LOG
+        LOG_WARN ("Rcv duplicated msg, current sequence number equal new sequence number=%u", new_seq_num);
         return SVB_OTA_SEQ_DUP;
     }
 
@@ -424,4 +427,17 @@ sbv_ota_fw_version_compare(const sbv_ota_fw_version_t *v1, const sbv_ota_fw_vers
         return (v1->build > v2->build) ? 1 : -1;
 
     return 0;
+}
+
+char *
+sbv_ota_Update_status_to_string (sbv_ota_upd_status status) {
+    switch (status)
+    {
+    case SBV_OTA_UPD_SUCCESS:
+        return "successful";
+    case SBV_OTA_UDP_FAILED:
+        return "failed";
+    default:
+        return "unknown";
+    }
 }

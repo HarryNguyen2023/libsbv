@@ -29,12 +29,6 @@ typedef enum sbv_ota_cmd_t
 	SBV_OTA_CMD_END,
 } sbv_ota_cmd_t;
 
-typedef enum sbv_ota_upd_status
-{
-	SBV_OTA_UPD_SUCCESS,
-  SBV_OTA_UDP_FAILED,
-} sbv_ota_upd_status;
-
 typedef struct sbv_ota_pkt_common_header_t {
   uint8_t   sof;
   uint8_t   packet_type;

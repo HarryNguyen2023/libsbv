@@ -3,7 +3,9 @@
 
 #include "sbv.h"
 #include "sbv_rtos.h"
+#include "sbv_log.h"
 #include "sbv_cqbuff.h"
+#include "sbv_ota.h"
 #include "sbv_ota_common.h"
 #include "sbv_ota_msg.h"
 #include "sbv_ota_fsm_common.h"
@@ -86,6 +88,10 @@ sbv_ota_master_fsm_init (void)
     sbv_ota_msg_master_handler.is_abort     = SBV_FALSE;
 
     sbv_ota_msg_master_handler.data_queue   = sbv_cqbuff_create (SBV_OTA_MASTER_RCV_BUFFER_SIZE, 1);
+    if (! sbv_ota_msg_master_handler.data_queue) {
+        LOG_ERROR ("Failed to create the circular buffer data queue for OTA master FSM task");
+        return;
+    }
 
     sbv_ota_master_rx_queue                 = sbv_rtos_create_queue (SBV_OTA_MASTER_RX_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
     sbv_ota_msg_master_handler.rx_queue     = sbv_ota_master_rx_queue;
@@ -99,6 +105,7 @@ sbv_ota_master_fsm_init (void)
 void
 sbv_ota_master_fsm_reset (void)
 {
+    LOG_WARN ("Resetting the OTA master FSM. aborting the update process...");
     sbv_ota_msg_master_handler.state        = SBV_OTA_STATE_IDLE;
     sbv_ota_msg_master_handler.next_state   = SBV_OTA_STATE_IDLE;
     sbv_ota_msg_master_handler.is_updating  = SBV_FALSE;
@@ -179,12 +186,14 @@ void sbv_ota_master_fsm_handle_state (void *data)
     current_state = sbv_ota_master_fsm_get_current_state();
     next_state    = sbv_ota_master_fsm_get_next_state();
 
+    LOG_INFO ("OTA master FSM is transiting from state %s to %s",
+              sbv_ota_fsm_state_to_string(sbv_ota_master_fsm_get_current_state()),
+              sbv_ota_fsm_state_to_string(sbv_ota_master_fsm_get_next_state()));
+
     if (next_state == SBV_OTA_STATE_IDLE
         || sbv_ota_master_fsm_is_update_aborted())
     {
-        // LOG
         sbv_ota_master_fsm_reset ();
-
         sbv_rtos_mutex_unlock (sbv_ota_msg_master_handler.mu);
         return;
     }
@@ -222,7 +231,7 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_START, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to send OTA cmd start packet to OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
@@ -231,12 +240,13 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_master_fsm_handle_resp (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to get OTA response for cmd start packet from OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
 
         if (! sbv_ota_master_fsm_is_acknowledged()) {
+            LOG_ERROR ("Failed to get OTA response ACK for cmd start packet from OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
@@ -248,7 +258,6 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
     sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE (SBV_OTA_STATE_HEADER,
                                                                        retry_time,
                                                                        sbv_ota_master_fsm_is_acknowledged());
-
     return;
 }
 
@@ -277,7 +286,7 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_msg_send_data_header (images, &data_info, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to send OTA header packet to OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
@@ -286,12 +295,13 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_master_fsm_handle_resp (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to get OTA response for header packet from OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
 
         if (! sbv_ota_master_fsm_is_acknowledged()) {
+            LOG_ERROR ("Failed to get OTA response ACK for header packet from OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
@@ -337,7 +347,7 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
             ret = sbv_ota_msg_send_data_frame (images, chunk_length, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
             if (ret < 0)
             {
-                /* LOG */
+                LOG_ERROR ("Failed to send OTA data packet to OTA slave FSM, retry num=%u", retry_time);
                 retry_time++;
                 continue;
             }
@@ -346,12 +356,13 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
             ret = sbv_ota_master_fsm_handle_resp (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
             if (ret != SBV_OK)
             {
-                /* LOG */
+                LOG_ERROR ("Failed to get OTA response for data packet from OTA slave FSM, retry num=%u", retry_time);
                 retry_time++;
                 continue;
             }
 
             if (! sbv_ota_master_fsm_is_acknowledged()) {
+                LOG_ERROR ("Failed to get OTA response ACK for data packet from OTA slave FSM, retry num=%u", retry_time);
                 retry_time++;
                 continue;
             }
@@ -390,7 +401,7 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_msg_send_cmd (SBV_OTA_CMD_END, sbv_ota_msg_master_handler.seq_num, SBV_OTA_MASTER_MSG_TIMEOUT_MS);
         if (ret < 0)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to send OTA cmd end packet to OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
@@ -399,12 +410,11 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
         ret = sbv_ota_master_fsm_handle_report (&sbv_ota_msg_master_handler, SBV_OTA_MASTER_END_MSG_TIMEOUT_MS);
         if (ret != SBV_OK)
         {
-            /* LOG */
+            LOG_ERROR ("Failed to get OTA report packet from OTA slave FSM, retry num=%u", retry_time);
             retry_time++;
             continue;
         }
 
-        /* LOG */
         break;
     }
 
@@ -427,7 +437,7 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
 
     master_handler = (sbv_ota_msg_master_handler_t *)param;
     if (! master_handler) {
-        // LOG
+        LOG_ERROR ("Invalid input: OTA master FSM handler is nil, aborting handling response packet");
         return -1;
     }
 
@@ -435,27 +445,27 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to get the header of reposne packet from OTA slave FSM");
         return ret;
     }
 
     ret = sbv_ota_packet_header_validate (&(resp_pkt.h), SBV_OTA_PACKET_TYPE_RESPONSE);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate the header of reposne packet from OTA slave FSM");
         return ret;
     }
-    
+
     ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(resp_pkt.status),
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     resp_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to get the status of reposne packet from OTA slave FSM");
         return ret;
     }
 
     ret = sbv_ota_msg_rx_resp_packet_validate (&resp_pkt, &(master_handler->peer_seq_num));
     if (ret != SBV_OK && ret != SVB_OTA_SEQ_DUP) {
-        // LOG
+        LOG_ERROR ("Failed to validate reposne packet from OTA slave FSM");
         return ret;
     }
 
@@ -474,7 +484,7 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
 
     master_handler = (sbv_ota_msg_master_handler_t *)param;
     if (! master_handler) {
-        // LOG
+        LOG_ERROR ("Invalid input: OTA master FSM handler is nil, aborting handling report packet");
         return -1;
     }
 
@@ -482,13 +492,13 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to get the header of report packet from OTA slave FSM");
         return ret;
     }
 
     ret = sbv_ota_packet_header_validate (&(report_pkt.h), SBV_OTA_PACKET_TYPE_REPORT);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate the header of report packet from OTA slave FSM");
         return ret;
     }
 
@@ -496,15 +506,18 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
                                     rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     report_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to get the update status of report packet from OTA slave FSM");
         return ret;
     }
 
     ret = sbv_ota_msg_rx_report_packet_validate (&report_pkt, &(master_handler->peer_seq_num));
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate report packet from OTA slave FSM");
         return ret;
     }
+
+    LOG_INFO ("Received OTA report packet from OTA slave FSM, update status=%s, firmware version=%s",
+              sbv_ota_Update_status_to_string (report_pkt.status), report_pkt.upd_fw_metadata.fw_version);
 
     // TODO: Save the report of the peer to filesystem
     // Send event over telemetry

@@ -4,6 +4,7 @@
 #include "sbv.h"
 #include "sbv_uart.h"
 #include "sbv_rtos.h"
+#include "sbv_log.h"
 #include "sbv_cqbuff.h"
 #include "sbv_uart.h"
 #include "sbv_can.h"
@@ -53,8 +54,10 @@ sbv_ota_msg_send_resp (uint8_t resp_type, uint16_t seq_num, uint16_t timeout_ms)
     uint32_t pkt_crc;
 	sbv_ota_resp_pkt_t resp_pkt;
 
-    if((resp_type != SBV_OTA_ACK) && (resp_type != SBV_OTA_NACK))
+    if((resp_type != SBV_OTA_ACK) && (resp_type != SBV_OTA_NACK)) {
+        LOG_ERROR ("Invalid SBV OTA response type");
         return -1;
+    }
 
     resp_pkt.h.sof 			= SBV_OTA_SOF;
     resp_pkt.h.packet_type 	= SBV_OTA_PACKET_TYPE_RESPONSE;
@@ -126,7 +129,7 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info, ui
     data_crc = sbv_ota_frame_crc((uint8_t *)data, data_info->fw_size);
     if (data_crc != data_info->fw_crc)
     {
-        /* LOG */
+        LOG_ERROR ("Data CRC mismatch, data crc=%x, expected crc=%x", data_crc, data_info->fw_crc);
         return -1;
     }
 
@@ -154,9 +157,9 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
         return -1;
 
 
-    if(data_length > SBV_OTA_DATA_MAX_SIZE)
+    if(data_length == 0 || data_length > SBV_OTA_DATA_MAX_SIZE)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid data length %d, maximum allowable length %u", data_length, SBV_OTA_DATA_MAX_SIZE);
         return -1;
     }
 
@@ -164,7 +167,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
     data_pkt   = sbv_rtos_malloc(pkt_length);
     if(! data_pkt)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to allocate memory for data packet");
         return -1;
     }
 
@@ -179,7 +182,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
     ret = sbv_ota_msg_send((uint8_t *)data_pkt, pkt_length, timeout_ms);
     if (ret < 0)
     {
-        /* LOG */
+        LOG_ERROR ("Failed to send OTA data packet");
         goto ERR;
     }
 
@@ -205,24 +208,24 @@ sbv_ota_packet_header_validate (sbv_ota_pkt_common_header_t *header, uint8_t pac
     uint16_t pkt_default_length;
 
     if (! header) {
-        // LOG
+        LOG_ERROR ("Invalid OTA packet input: header of packet is nil");
         return SBV_ERROR;
     }
 
     if(header->sof != SBV_OTA_SOF)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA packet header field, sof=%u which must be %u", header->sof, SBV_OTA_SOF);
         return SBV_ERROR;
     }
 
     if(header->packet_type != packet_type)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA packet header type, type=%u, expected type=%u", header->packet_type, packet_type);
         return SBV_ERROR;
     }
 
     if (header->length == 0 || header->length > SBV_OTA_DATA_MAX_SIZE) {
-        // LOG
+        LOG_ERROR ("Invalid OTA packet length, length=%u, maximum allowable length=%u", header->length, SBV_OTA_DATA_MAX_SIZE);
         return SBV_ERROR;
     }
 
@@ -263,17 +266,17 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
     new_crc         = sbv_ota_frame_crc((uint8_t *)cmd_pkt, sizeof(sbv_ota_cmd_pkt_t));
     if(pkt_crc != new_crc)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA cmd packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
         goto ERR_EXIT;
     }
 
     if (cmd_type == SBV_OTA_CMD_START) {
-        // LOG
+        LOG_INFO ("Receive OTA packet cmd with start sequence number is %u", cmd_pkt->h.seq_num);
         *seq_num = cmd_pkt->h.seq_num;
     } else {
         ret = sbv_ota_seq_num_validate (seq_num, cmd_pkt->h.seq_num, SBV_OTA_CMD_PACKET_LEN);
         if (ret != SBV_OK) {
-            // LOG
+            LOG_ERROR ("Failed to validate the sequence number of OTA cmd packet");
             return ret;
         }
     }
@@ -298,7 +301,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     new_crc         = sbv_ota_frame_crc((uint8_t *)head_pkt, sizeof(sbv_ota_header_pkt_t));
     if(pkt_crc != new_crc)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA header packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
         goto ERR_EXIT;
     }
 
@@ -306,13 +309,14 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
 
     // Check firmware size limit
     if (head_pkt->data_info.fw_size == 0 || head_pkt->data_info.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
-        // LOG
+        LOG_ERROR ("Invalid OTA image size, size=%u, maximum allowable size=%u",
+                   head_pkt->data_info.fw_size, SBV_OTA_SLOT_MAX_SIZE);
         return -1;
     }
 
     ret = sbv_ota_seq_num_validate (seq_num, head_pkt->h.seq_num, SBV_OTA_HEADER_PACKET_LEN);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate the sequence number of OTA header packet");
         return ret;
     }
 
@@ -336,13 +340,13 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
     new_crc         = sbv_ota_frame_crc((uint8_t *)data_pkt, pkt_length);
     if(pkt_crc != new_crc)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA data packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
         goto ERR_EXIT;
     }
 
     ret = sbv_ota_seq_num_validate (seq_num, data_pkt->h.seq_num, data_pkt->h.length);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate the sequence number of OTA data packet");
         return ret;
     }
 
@@ -366,13 +370,13 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
     new_crc         = sbv_ota_frame_crc((uint8_t *)resp_pkt, sizeof(sbv_ota_resp_pkt_t));
     if(pkt_crc != new_crc)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA response packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
         goto ERR_EXIT;
     }
 
     ret = sbv_ota_seq_num_validate (seq_num, resp_pkt->h.seq_num, SBV_OTA_RESP_PACKET_LEN);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate the sequence number of OTA response packet");
         return ret;
     }
 
@@ -397,13 +401,13 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
     new_crc            = sbv_ota_frame_crc((uint8_t *)report_pkt, sizeof(sbv_ota_report_pkt_t));
     if(pkt_crc != new_crc)
     {
-        /* LOG */
+        LOG_ERROR ("Invalid OTA report packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
         goto ERR_EXIT;
     }
 
     ret = sbv_ota_seq_num_validate (seq_num, report_pkt->h.seq_num, SBV_OTA_REP_PACKET_LEN);
     if (ret != SBV_OK) {
-        // LOG
+        LOG_ERROR ("Failed to validate the sequence number of OTA report packet");
         return ret;
     }
 
@@ -421,7 +425,7 @@ sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue, void *packet,
     uint32_t start_tick = sbv_rtos_get_tick();
 
     if (! queue || ! rcv_buffer || buffer_size == 0 || ! data_size || ! packet) {
-        // LOG
+        LOG_ERROR ("Invalid input, aborting rcv OTA msg");
         return -1;
     }
 
@@ -429,25 +433,25 @@ sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue, void *packet,
             && sbv_cqbuff_get_size (queue) < data_size) {
         data_len = sbv_ota_rcv_data (queue_instance, rcv_buffer, buffer_size, timeout_ms);
         if (data_len <= 0) {
-            // LOG
+            LOG_ERROR ("Failed to receive OTA msg, rcv length=%u", data_len);
             goto ERR_EXIT;
         }
 
         ret = sbv_cqbuff_write (queue, rcv_buffer, data_len);
         if (ret != data_len) {
-            /* LOG */
+            LOG_ERROR ("Write %u bytes into the circular buffer of OTA msg while expected %u bytes", ret, data_len);
             goto ERR_EXIT;
         }
     }
 
     if(sbv_cqbuff_get_size (queue) < data_size) {
-       // LOG
+        LOG_ERROR ("Failed to read %u bytes of OTA msg", data_size);
         goto ERR_EXIT;
     }
 
     ret = sbv_cqbuff_read(queue, (unsigned char *)packet, data_size);
     if (ret != data_size) {
-        /* LOG */
+        LOG_ERROR ("Read %u bytes of OTA msg from circular buffer while expected to be %u bytes", ret, data_size);
         goto ERR_EXIT;
     }
 
