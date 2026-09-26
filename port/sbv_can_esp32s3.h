@@ -10,7 +10,7 @@
 #define SBV_CAN_STD_ID_FILTER_ID_OFFSET (21)
 
 #define SBV_CAN_MAX_CHANNEL             (1)
-#define SBV_CAN_RCV_BUFFER_SIZE         (512)
+#define SBV_CAN_RCV_BUFFER_SIZE         (64)
 
 typedef twai_message_t      sbv_can_tx_pkt_t;
 typedef twai_message_t      sbv_can_rx_pkt_t;

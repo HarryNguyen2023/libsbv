@@ -2,8 +2,8 @@
 #define SBV_CONFIG_H
 
 /*Define the suitable type of hardware use for the whole sbv library*/
-#define STM32F1xx
-// #define ESP32xx_IDF
+// #define STM32F1xx
+#define ESP32xx_IDF
 
 /*Define the IMU type*/
 #define SBV_MPU9250
