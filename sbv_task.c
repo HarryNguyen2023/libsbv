@@ -11,24 +11,29 @@
 #include "sbv_can.h"
 #include "sbv_uart.h"
 #include "sbv_debug.h"
-// #include "sbv_ota_common.h"
-// #include "sbv_ota.h"
-// #include "sbv_ota_msg.h"
-// #include "sbv_ota_slave_fsm.h"
-// #include "sbv_ota_master_fsm.h"
 #include "sbv_pid.h"
 #include "sbv_gpio.h"
 #include "sbv_motor.h"
 #include "sbv_control_speed.h"
 #include "sbv_control_balance.h"
+#ifdef ESP32xx_IDF
+#include "sbv_ota_common.h"
+#include "sbv_ota.h"
+#include "sbv_ota_msg.h"
+#include "sbv_ota_slave_fsm.h"
+#include "sbv_ota_master_fsm.h"
+#endif /* ESP32xx_IDF */
 
 /************************ Gloabal variables declaration ***************************/
 /* Static task objects */
 static sbv_rtos_stack_type_t debug_stack[STACK_SIZE_BASE];
+#ifdef STM32F1xx
 static sbv_rtos_stack_type_t balance_crtl_stack[STACK_SIZE_BASE * 4];
+#endif /* STM32F1xx */
 
 sbv_rtos_task_handle_t sbv_default_init_handle;
 sbv_rtos_static_task_t sbv_debug_handle;
+#ifdef STM32F1xx
 sbv_rtos_static_task_t sbv_balance_ctrl_handle;
 
 /* Control task's obbjects */
@@ -36,24 +41,31 @@ sbv_control_balance_t   sbv_control_balance;
 sbv_imu_instance_t      sbv_imu_instance;
 sbv_i2c_instance_t      sbv_i2c_1;
 extern sbv_i2c_handle_t hi2c1;
+#endif /* STM32F1xx */
 
 /* Debug task's objects */
 extern sbv_uart_handle_t     huart1;
 extern sbv_uart_dma_handle_t hdma_usart1_rx;
-sbv_gpio_num_t               uart_pin[2] = {SBV_GPIO_NUM_13, SBV_GPIO_NUM_7};
+sbv_gpio_num_t               uart_pin[2] = {SBV_GPIO_NUM_17, SBV_GPIO_NUM_18};
 sbv_uart_instance_t          sbv_uart_1 = {0};
 
 /* CAN router task's object */
 extern sbv_can_handle_t     hcan;
 sbv_can_instance_t          sbv_can_instance;
 
-// sbv_ota_ipc_t   sbv_ota_queues;
+#ifdef ESP32xx_IDF
+sbv_ota_ipc_t   sbv_ota_queues;
+#endif /* ESP32xx_IDF */
 
 void sbv_led_init_blink (void);
 void sbv_task_init(void);
+#ifdef STM32F1xx
 void sbv_task_balance_control(void *param);
+#endif /* STM32F1xx */
 void sbv_task_debug_console_task(void *param);
-// void sbv_task_ota_init (uint8_t is_master);
+#ifdef ESP32xx_IDF
+void sbv_task_ota_init (uint8_t is_master);
+#endif /* ESP32xx_IDF */
 
 void
 sbv_default_init_task (void *param) {
@@ -67,13 +79,17 @@ sbv_default_init_task (void *param) {
     /* CAN interface initialization */
     sbv_can_init(&sbv_can_instance, &hcan);
 
+#ifdef STM32F1xx
     /* Initialize the robot control system */
     sbv_control_balance_init(&sbv_control_balance, &sbv_imu_instance, &sbv_i2c_1, &hi2c1);
+#endif /* STM32F1xx */
 
     /* Blink LED and wait for hardware system to stablize before starting software tasks */
     sbv_led_init_blink();
 
-    // sbv_task_ota_init (SBV_FALSE);
+#ifdef ESP32xx_IDF
+    sbv_task_ota_init (SBV_TRUE);
+#endif /* ESP32xx_IDF */
 
     sbv_task_init();
 
@@ -83,7 +99,7 @@ sbv_default_init_task (void *param) {
 void
 sbv_init(void)
 {
-    xTaskCreate(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
+    sbv_rtos_task_create(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
 
     sbv_rtos_start_task_scheduler();
 }
@@ -106,13 +122,14 @@ sbv_task_init(void)
 
     sbv_rtos_task_create(sbv_task_debug_console_task, "debug", STACK_SIZE_BASE,
                         NULL, 2, debug_stack, &sbv_debug_handle);
-
+#ifdef STM32F1xx
     sbv_rtos_task_create(sbv_task_balance_control, "balance_ctrl", STACK_SIZE_BASE * 4,
                         NULL, 4, balance_crtl_stack, &sbv_balance_ctrl_handle);
-
+#endif /* STM32F1xx */
     LOG_INFO ("SBV system has finished inialization!");
 }
 
+#ifdef STM32F1xx
 /*
  * Task for control of the robot
  */
@@ -149,6 +166,7 @@ sbv_task_balance_control(void *param)
         }
     }
 }
+#endif /* STM32F1xx */
 
 /*
  * Task for debugging via UART
@@ -184,20 +202,22 @@ sbv_task_debug_console_task(void *param)
     }
 }
 
-// void
-// sbv_task_ota_init (uint8_t is_master) {
-//     int ret;
+#ifdef ESP32xx_IDF
+void
+sbv_task_ota_init (uint8_t is_master) {
+    int ret;
 
-//     ret = sbv_ota_ipc_queue_init (&sbv_ota_queues);
-//     if (ret != SBV_OK) {
-//         // LOG
-//         return;
-//     }
+    ret = sbv_ota_ipc_queue_init (&sbv_ota_queues);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to initiate IPC queue for OTA tasks");
+        return;
+    }
 
-//     sbv_ota_update_init (&sbv_ota_queues);
-//     sbv_ota_slave_fsm_init (&sbv_ota_queues);
+    sbv_ota_update_init (&sbv_ota_queues);
+    sbv_ota_slave_fsm_init (&sbv_ota_queues);
 
-//     if (is_master) {
-//         sbv_ota_master_fsm_init ();
-//     }
-// }
+    if (is_master) {
+        sbv_ota_master_fsm_init ();
+    }
+}
+#endif /* ESP32xx_IDF */

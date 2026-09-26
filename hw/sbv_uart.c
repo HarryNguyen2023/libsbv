@@ -15,6 +15,7 @@ struct sbv_uart_hw_cb_t sbv_uart_hw_cb = {
     .sbv_uart_init              = sbv_uart_esp32s3_init,
     .sbv_uart_tx_send_data      = sbv_uart_esp32s3_send_data,
     .sbv_uart_rx_rcv_data       = sbv_uart_esp32s3_rcv_data,
+    .sbv_uart_register_rx_cb    = sbv_uart_esp32s3_register_rx_cb,
 #endif /* STM32F1xx */
 };
 

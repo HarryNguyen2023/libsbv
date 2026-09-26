@@ -223,8 +223,10 @@ sbv_can_stm32f1xx_send_data(sbv_can_instance_t *can_instance,
     uint16_t total_tx_bytes = 0, cur_tx_bytes = 0;
     sbv_can_tx_pkt_t can_tx_pkt;
 
-    if(! can_instance || ! data || (length == 0))
+    if(! can_instance || ! data || (length == 0)) {
+        LOG_ERROR ("Invalid input, skipping sending CAN data");
         return SBV_ERROR;
+    }
 
     while (total_tx_bytes < length)
     {
@@ -234,17 +236,18 @@ sbv_can_stm32f1xx_send_data(sbv_can_instance_t *can_instance,
         ret = sbv_can_stm32f1xx_send_pkt(can_instance->can_handle, &can_tx_pkt);
         if (ret != SBV_OK)
         {
-            // LOG
-            if (try_num++ >= SBV_CAN_MAX_WRITE_RETRY)
+            LOG_ERROR ("Failed to send CAN data, retry num=%u", ++try_num);
+            if (try_num >= SBV_CAN_MAX_WRITE_RETRY)
             {
-                // LOG
                 break;
             }
+
+            continue;
         }
         total_tx_bytes += cur_tx_bytes;
     }
 
-    LOG_DEBUG ("Write %u bytes via CAN TX, retry number %u", total_tx_bytes, try_num);
+    LOG_DEBUG ("Write %u bytes via CAN TX, retry num=%u", total_tx_bytes, try_num);
 
     return total_tx_bytes;
 }
@@ -262,7 +265,7 @@ sbv_can_stm32f1xx_rx_hw_callback(sbv_can_handle_t *can_hanlde)
     can_instance = sbv_can_stm32f1xx_get_instance_by_handle (can_hanlde);
     if (can_instance == NULL)
     {
-        // LOG_ERROR ("Failed to lookup for the CAN instance from the list");
+        LOG_ERROR ("Failed to lookup for the CAN instance from the list");
         return;
     }
 
@@ -295,6 +298,11 @@ sbv_can_stm32f1xx_rcv_data (sbv_can_instance_t *can_instance,
 {
     uint16_t rx_buffer_size;
     sbv_rtos_tick_type_t tick_to_wait;
+
+    if (! can_instance || ! rcv_buffer || buffer_length == 0) {
+        LOG_ERROR ("Invallid input, skipping receive CAN data");
+        return 0;
+    }
 
     tick_to_wait = sbv_rtos_ms_to_tick(rcv_timeout_ms);
 

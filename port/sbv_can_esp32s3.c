@@ -1,17 +1,17 @@
+#include <stdio.h>
 #include <string.h>
+
+#include "sbv.h"
+#include "sbv_log.h"
 #include "sbv_rtos.h"
+#include "sbv_gpio.h"
 #include "sbv_cqbuff.h"
 #include "sbv_can.h"
 #include "sbv_can_esp32s3.h"
 
 #ifdef ESP32xx_IDF
 
-sbv_can_instance_t sbv_can_instance;
-
-extern sbv_rtos_mutex_t SBV_CAN_RX_BUFFER_MUTEX;
-extern sbv_rtos_mutex_t SBV_CAN_TX_BUFFER_MUTEX;
-
-twai_general_config_t   g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_19, GPIO_NUM_20, TWAI_MODE_NORMAL);
+twai_general_config_t   gen_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_5, GPIO_NUM_4, TWAI_MODE_NORMAL);
 twai_filter_config_t    filter_config;
 twai_timing_config_t    time_config = TWAI_TIMING_CONFIG_500KBITS();
 
@@ -25,36 +25,30 @@ sbv_can_esp32s3_filter_init(void)
 }
 
 void
-sbv_can_esp32s3_init(void* can_handle)
+sbv_can_esp32s3_init(sbv_can_instance_t *can_instance,
+                     void *can_handle)
 {
     /*Intiiate CAN_RX filtering*/
     sbv_can_esp32s3_filter_init();
 
-    memset (&sbv_can_instance, 0, sizeof (sbv_can_instance_t));
-    sbv_can_instance.can_active          = SBV_TRUE;
-    sbv_can_instance.can_rx_notify_task  = NULL;
-    sbv_can_instance.can_handle          = can_handle;
-    sbv_can_instance.can_reg_callback    = SBV_FALSE;
+    memset (can_instance, 0, sizeof (sbv_can_instance_t));
+    can_instance->can_rcv_buf = sbv_cqbuff_create(SBV_CAN_RCV_BUFFER_SIZE, 1);
 
-    /* Create the mutex for the CAN TX and RX FIFO */
-    sbv_rtos_mutex_create(SBV_CAN_RX_BUFFER_MUTEX);
-    sbv_rtos_mutex_create(SBV_CAN_TX_BUFFER_MUTEX);
-
-    twai_driver_install(&g_config, &time_config, &filter_config);
+    twai_driver_install(&gen_config, &time_config, &filter_config);
     twai_start();
 
     return;
 }
 
 static int
-sbv_can_esp32s3_send_pkt(sbv_can_tx_pkt_t *can_pkt)
+sbv_can_esp32s3_send_pkt(const sbv_can_tx_pkt_t *can_pkt)
 {
     int ret = SBV_OK;
 
     if(! can_pkt)
         return SBV_ERROR;
 
-    ret = twai_transmit(can_pkt, sbv_rtos_ms_to_tick(SBV_CAN_TX_TIMEOUT));
+    ret = twai_transmit(can_pkt, sbv_rtos_ms_to_tick(0));
 
     return ret;
 }
@@ -78,7 +72,8 @@ sbv_can_esp32s3_std_id_get (uint32_t msg_id)
 }
 
 static int
-sbv_can_esp32s3_header_format(sbv_can_tx_pkt_t *can_pkt, sbv_can_msg_type_t msg_type,
+sbv_can_esp32s3_header_format(sbv_can_tx_pkt_t *can_pkt,
+                              sbv_can_msg_type_t msg_type,
                               uint8_t *data, uint8_t length)
 {
     uint32_t std_id;
@@ -130,57 +125,84 @@ sbv_can_esp32s3_header_format(sbv_can_tx_pkt_t *can_pkt, sbv_can_msg_type_t msg_
 }
 
 int
-sbv_can_esp32s3_send_data(sbv_can_msg_type_t msg_type, uint8_t *data, uint8_t length)
+sbv_can_esp32s3_send_data(sbv_can_instance_t *can_instance,
+                          sbv_can_msg_type_t msg_type,
+                          uint8_t *data, uint16_t length)
 {
-    int ret = SBV_OK, total_tx_bytes = 0, cur_tx_bytes = 0;
+    int ret = SBV_OK;
+    uint8_t try_num = 0;
+    uint16_t total_tx_bytes = 0, cur_tx_bytes = 0;
     sbv_can_tx_pkt_t can_tx_pkt;
 
-    if(!data || !length
-        || !(sbv_can_instance.can_active))
+    if(! can_instance || ! data || (length == 0)) {
+        LOG_ERROR ("Invalid input, skipping sending CAN data");
         return SBV_ERROR;
-
-    SBV_CAN_TX_BUFFER_MUTEX_LOCK;
+    }
 
     while (total_tx_bytes < length)
     {
-        cur_tx_bytes = sbv_can_esp32s3_header_format (&can_tx_pkt, msg_type, data + total_tx_bytes, length - total_tx_bytes);
+        cur_tx_bytes = sbv_can_esp32s3_header_format(&can_tx_pkt, msg_type,
+                                                    data + total_tx_bytes,
+                                                    length - total_tx_bytes);
         ret = sbv_can_esp32s3_send_pkt (&can_tx_pkt);
-        if (ret != SBV_OK)
+        if (ret != SBV_OK) {
+            LOG_ERROR ("Failed to send CAN data, retry num=%u", ++try_num);
+            if (try_num >= SBV_CAN_MAX_WRITE_RETRY)
+            {
+                break;
+            }
+
             continue;
+        }
         total_tx_bytes += cur_tx_bytes;
     }
 
-    SBV_CAN_TX_BUFFER_MUTEX_UNLOCK;
+    LOG_DEBUG ("Write %u bytes via CAN TX, retry num=%u", total_tx_bytes, try_num);
 
     return total_tx_bytes;
 }
 
-uint8_t *
-sbv_can_esp32s3_rcv_data(uint8_t *length, uint16_t *std_id)
+uint16_t
+sbv_can_esp32s3_rcv_data (sbv_can_instance_t *can_instance,
+                          uint8_t *rcv_buffer, uint16_t buffer_length,
+                          uint16_t rcv_timeout_ms)
 {
+    int ret;
+    uint16_t rx_buffer_size;
     sbv_rtos_tick_type_t tick_to_wait;
     sbv_can_rx_pkt_t can_rx_pkt;
 
-    tick_to_wait = SBV_CAN_RX_TIMEOUT;
-
-    SBV_CAN_RX_BUFFER_MUTEX_LOCK;
-
-    memset(&(sbv_can_instance.can_rx_packet), 0, sizeof(sbv_can_rx_pkt_t));
-
-    twai_receive(&(sbv_can_instance.can_rx_packet), tick_to_wait);
-
-    *length = (sbv_can_instance.can_rx_packet).data_length_code;
-    *std_id = (sbv_can_instance.can_rx_packet).identifier;
-
-    SBV_CAN_RX_BUFFER_MUTEX_UNLOCK;
-
-    /* Avoid loopback CAN packet self-originate */
-    if((*std_id & 0x1F) == SBV_CAN_STD_ID_NODE_ID)
-    {
-        *length = 0;
-        return NULL;
+    if (! can_instance || ! rcv_buffer || buffer_length == 0) {
+        LOG_ERROR ("Invallid input, skipping receive CAN data");
+        return 0;
     }
 
-    return (sbv_can_instance.can_rx_packet).data;
+    tick_to_wait = sbv_rtos_ms_to_tick(rcv_timeout_ms);
+
+    memset(&can_rx_pkt, 0, sizeof(sbv_can_rx_pkt_t));
+
+    ret = twai_receive(&can_rx_pkt, tick_to_wait);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed to rcv CAN data, ret=%d", ret);
+        return 0;
+    }
+    
+    if (can_instance->can_rcv_buf)
+    {
+        sbv_cqbuff_write (can_instance->can_rcv_buf,
+                          (unsigned char *)&can_rx_pkt, sizeof(sbv_can_rx_pkt_t));
+    }
+
+    rx_buffer_size = sbv_cqbuff_get_size (can_instance->can_rcv_buf);
+    if (rx_buffer_size == 0)
+        return 0;
+
+    LOG_DEBUG ("Received %u bytes via CAN RX", rx_buffer_size);
+
+    rx_buffer_size = (rx_buffer_size < buffer_length) ? rx_buffer_size : buffer_length;
+    rx_buffer_size = sbv_cqbuff_read (can_instance->can_rcv_buf,
+                                      rcv_buffer, rx_buffer_size);
+
+    return rx_buffer_size;
 }
 #endif /* ESP32xx_IDF */
