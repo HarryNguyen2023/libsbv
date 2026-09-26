@@ -85,7 +85,7 @@ sbv_uart_stm32f1xx_init (sbv_uart_instance_t *uart_instance, sbv_uart_handle_t* 
 
     if (sbv_uart_stm32f1xx_add_instance_to_list (uart_instance) != SBV_OK)
     {
-        LOG_ERROR ("Failed to add new UART instance to list");
+        LOG_ERROR ("UART instance reach limit, maxmium allowable is %u", SBV_UART_MAX_CHANNEL);
         return SBV_ERROR;
     }
 
@@ -135,8 +135,10 @@ sbv_uart_stm32f1xx_send_data(sbv_uart_instance_t* uart_instance, uint8_t* uart_t
 {
     int ret = SBV_OK;
 
-    if(! uart_instance || ! uart_tx_data || uart_tx_size == 0)
+    if(! uart_instance || ! uart_tx_data || uart_tx_size == 0) {
+        LOG_ERROR ("Invalid input, skip sending UART data");
         return SBV_ERROR;
+    }
 
     // SBV_UART_MUTEX_LOCK (uart_instance);
 
@@ -144,7 +146,7 @@ sbv_uart_stm32f1xx_send_data(sbv_uart_instance_t* uart_instance, uint8_t* uart_t
                                          uart_tx_data, uart_tx_size, timeout_ms);
     if (ret != SBV_OK)
     {
-        // LOG
+        LOG_ERROR ("Fail to send UART data ");
         // SBV_UART_MUTEX_UNLOCK (uart_instance);
         return ret;
     }
@@ -203,8 +205,10 @@ sbv_uart_stm32f1xx_rcv_data (sbv_uart_instance_t* uart_instance,
     uint16_t rx_buffer_size;
     sbv_rtos_tick_type_t tick_to_wait;
 
-    if (! uart_instance)
+    if (! uart_instance || ! recv_buff || size == 0) {
+        LOG_ERROR ("Invalid input, skip receiving UART data");
         return SBV_ERROR;
+    }
 
     tick_to_wait = sbv_rtos_ms_to_tick(timeout_ms);
 
@@ -258,8 +262,10 @@ int
 sbv_uart_stm32f1xx_register_rx_cb (sbv_uart_instance_t* uart_instance,
                                    int (*uart_rx_cb)(uint8_t *, const uint16_t))
 {
-    if (! uart_rx_cb || ! uart_instance)
+    if (! uart_rx_cb || ! uart_instance) {
+        LOG_ERROR ("Invalid input, failed to register UART receive cb");
         return -1;
+    }
 
     SBV_UART_MUTEX_LOCK (uart_instance);
 
