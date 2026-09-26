@@ -44,7 +44,7 @@ sbv_mpu9250_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
     if (!i2c_instance || ! i2c_handle)
         return SBV_ERROR;
 
-    ret = sbv_i2c_master_init (i2c_instance, i2c_handle);
+    ret = sbv_i2c_master_init (i2c_instance, i2c_handle, SBV_MPU9250_I2C_ADDR);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to initlaizae I2C master, abort MPU9250 init");
         return ret;

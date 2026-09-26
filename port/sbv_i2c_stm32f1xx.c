@@ -59,7 +59,9 @@ sbv_i2c_stm32f1xx_master_add_instance_to_list (sbv_i2c_instance_t *i2c_instance)
 
 /* Initialize an I2C instance, attach its HAL handle, and prepare the RX buffer state. */
 int
-sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
+sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance,
+                              sbv_i2c_handle_t *i2c_handle,
+                              uint8_t slave_addr)
 {
     if(! i2c_instance || ! i2c_handle)
         return SBV_ERROR;

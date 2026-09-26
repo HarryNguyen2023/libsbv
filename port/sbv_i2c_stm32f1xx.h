@@ -32,7 +32,9 @@ struct sbv_i2c_instance_list_t {
 };
 
 int
-sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle);
+sbv_i2c_stm32f1xx_master_init(sbv_i2c_instance_t *i2c_instance,
+                              sbv_i2c_handle_t *i2c_handle,
+                              uint8_t slave_addr);
 int
 sbv_i2c_stm32f1xx_master_send_data (sbv_i2c_instance_t *i2c_instance, uint8_t slave_add,
                                     sbv_i2c_msg_t msg_type, uint8_t* i2c_tx_data,

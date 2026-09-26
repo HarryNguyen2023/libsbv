@@ -5,8 +5,8 @@
 #include "sbv_rtos.h"
 #include "sbv_log.h"
 #include "sbv_cqbuff.h"
-#include "sbv_ota.h"
 #include "sbv_ota_common.h"
+#include "sbv_ota.h"
 #include "sbv_ota_msg.h"
 #include "sbv_ota_fsm_common.h"
 #include "sbv_ota_master_fsm.h"
@@ -333,6 +333,7 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
     //
     //
 
+    retry_time = 0;
     while (image_length > 0)
     {
         chunk_length = (image_length > SBV_OTA_DATA_MAX_SIZE) ? SBV_OTA_DATA_MAX_SIZE : image_length;

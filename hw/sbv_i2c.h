@@ -12,17 +12,21 @@ typedef enum sbv_i2c_msg_t
 
 #ifdef STM32F1xx
 #include "sbv_i2c_stm32f1xx.h"
-#endif
+#elif defined ESP32xx_IDF
+#include "sbv_i2c_esp32s3.h"
+#endif 
 
 typedef struct sbv_i2c_hw_cb_t
 {
-    int (*sbv_i2c_master_init) (sbv_i2c_instance_t *, sbv_i2c_handle_t *);
+    int (*sbv_i2c_master_init) (sbv_i2c_instance_t *, sbv_i2c_handle_t *, uint8_t);
     int (*sbv_i2c_master_send_data) (sbv_i2c_instance_t *, uint8_t, sbv_i2c_msg_t, uint8_t*, uint16_t, uint16_t);
     int (*sbv_i2c_master_rcv_data) (sbv_i2c_instance_t *, uint8_t, uint8_t[], uint16_t, uint16_t);
 } sbv_i2c_hw_cb_t;
 
 int
-sbv_i2c_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle);
+sbv_i2c_master_init(sbv_i2c_instance_t *i2c_instance,
+                    sbv_i2c_handle_t *i2c_handle,
+                    uint8_t slave_addr);
 int
 sbv_i2c_master_send_data (sbv_i2c_instance_t *i2c_instance, uint8_t slave_add,
                           sbv_i2c_msg_t msg_type, uint8_t* i2c_tx_data,

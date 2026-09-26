@@ -1,8 +1,8 @@
 #ifndef SBV_SYSTEM_STM32F1XX_H
 #define SBV_SYSTEM_STM32F1XX_H
 
-uint32_t
-sbv_system_stm32f1xx_get_uid (void);
+int
+sbv_system_stm32f1xx_get_uid (uint32_t uid[]);
 void
 sbv_system_stm32f1xx_reset (void);
 void

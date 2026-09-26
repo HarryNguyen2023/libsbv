@@ -1,7 +1,7 @@
 #ifndef SBV_OTA_COMMON_H
 #define SBV_OTA_COMMON_H
 
-#ifdef STM32F1xx
+// #ifdef STM32F1xx
 #define SBV_OTA_SLOT_NO           2
 #define SBV_OTA_INVALID_SLOT      (0xFFu)
 
@@ -22,16 +22,14 @@
 #define SBV_OTA_CONFIG_FLASH_ADD    (0x0800F800u)
 #define SBV_OTA_SLOT0_FLASH_ADD     (0x08003000u)
 #define SBV_OTA_SLOT1_FLASH_ADD     (0X08009400u)
-#else
-#define SBV_OTA_SLOT_NO             (0)
-#endif /*STM32F1xx*/
+// #endif /*STM32F1xx*/
 
 #define SBV_OTA_DATA_MAX_SIZE       (1024)
 
 #define SBV_OTA_SLOT_PAGE_ADDR(SLOT) \
         (SLOT == 0) ? SBV_OTA_SLOT0_FLASH_ADD : SBV_OTA_SLOT1_FLASH_ADD
 
-#define SBV_OTA_FW_VERSION_LENGTH   12
+#define SBV_OTA_FW_VERSION_LENGTH   20
 #define SBV_OTA_FW_TIME_LENGTH      20
 
 #define SVB_OTA_SEQ_DUP             (-3)

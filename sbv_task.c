@@ -35,13 +35,13 @@ sbv_rtos_task_handle_t sbv_default_init_handle;
 sbv_rtos_static_task_t sbv_debug_handle;
 #ifdef STM32F1xx
 sbv_rtos_static_task_t sbv_balance_ctrl_handle;
+#endif /* STM32F1xx */
 
 /* Control task's obbjects */
 sbv_control_balance_t   sbv_control_balance;
 sbv_imu_instance_t      sbv_imu_instance;
 sbv_i2c_instance_t      sbv_i2c_1;
 extern sbv_i2c_handle_t hi2c1;
-#endif /* STM32F1xx */
 
 /* Debug task's objects */
 extern sbv_uart_handle_t     huart1;
@@ -59,13 +59,9 @@ sbv_ota_ipc_t   sbv_ota_queues;
 
 void sbv_led_init_blink (void);
 void sbv_task_init(void);
-#ifdef STM32F1xx
 void sbv_task_balance_control(void *param);
-#endif /* STM32F1xx */
 void sbv_task_debug_console_task(void *param);
-#ifdef ESP32xx_IDF
 void sbv_task_ota_init (uint8_t is_master);
-#endif /* ESP32xx_IDF */
 
 void
 sbv_default_init_task (void *param) {
@@ -99,7 +95,7 @@ sbv_default_init_task (void *param) {
 void
 sbv_init(void)
 {
-    sbv_rtos_task_create(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
+    xTaskCreate(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
 
     sbv_rtos_start_task_scheduler();
 }
@@ -129,7 +125,6 @@ sbv_task_init(void)
     LOG_INFO ("SBV system has finished inialization!");
 }
 
-#ifdef STM32F1xx
 /*
  * Task for control of the robot
  */
@@ -166,7 +161,6 @@ sbv_task_balance_control(void *param)
         }
     }
 }
-#endif /* STM32F1xx */
 
 /*
  * Task for debugging via UART
@@ -202,7 +196,6 @@ sbv_task_debug_console_task(void *param)
     }
 }
 
-#ifdef ESP32xx_IDF
 void
 sbv_task_ota_init (uint8_t is_master) {
     int ret;
@@ -220,4 +213,3 @@ sbv_task_ota_init (uint8_t is_master) {
         sbv_ota_master_fsm_init ();
     }
 }
-#endif /* ESP32xx_IDF */

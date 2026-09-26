@@ -8,14 +8,20 @@ sbv_i2c_hw_cb_t sbv_i2c_hw_cb = {
     .sbv_i2c_master_init        = sbv_i2c_stm32f1xx_master_init,
     .sbv_i2c_master_send_data   = sbv_i2c_stm32f1xx_master_send_data,
     .sbv_i2c_master_rcv_data    = sbv_i2c_stm32f1xx_master_rcv_data,
+#elif defined ESP32xx_IDF
+    .sbv_i2c_master_init        = sbv_i2c_esp32s3_master_init,
+    .sbv_i2c_master_send_data   = sbv_i2c_esp32s3_master_send_data,
+    .sbv_i2c_master_rcv_data    = sbv_i2c_esp32s3_master_rcv_data,
 #endif /* STM32F1xx */
 };
 
 int
-sbv_i2c_master_init(sbv_i2c_instance_t *i2c_instance, sbv_i2c_handle_t *i2c_handle)
+sbv_i2c_master_init(sbv_i2c_instance_t *i2c_instance,
+                    sbv_i2c_handle_t *i2c_handle,
+                    uint8_t slave_addr)
 {
     if (sbv_i2c_hw_cb.sbv_i2c_master_init)
-        return (sbv_i2c_hw_cb.sbv_i2c_master_init) (i2c_instance, i2c_handle);
+        return (sbv_i2c_hw_cb.sbv_i2c_master_init) (i2c_instance, i2c_handle, slave_addr);
 
     return SBV_ERROR;
 }

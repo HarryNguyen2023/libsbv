@@ -13,7 +13,7 @@
 #define SBV_CAN_STD_ID_FILTER_ID_OFFSET (5)
 
 #define SBV_CAN_MAX_CHANNEL             (1)
-#define SBV_CAN_RCV_BUFFER_SIZE         (512)
+#define SBV_CAN_RCV_BUFFER_SIZE         (64)
 
 typedef CAN_HandleTypeDef       sbv_can_handle_t;
 typedef CAN_TxHeaderTypeDef     sbv_can_tx_header_t;

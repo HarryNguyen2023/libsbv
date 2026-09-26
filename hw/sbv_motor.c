@@ -13,7 +13,7 @@
 void
 sbv_motor_init(sbv_motor_t *motor)
 {
-    u_int16_t tim_channel = 0;
+    uint16_t tim_channel = 0;
 
     if(! motor)
         return;
@@ -61,6 +61,8 @@ sbv_motor_read_encoder(sbv_motor_t *motor)
 
 #ifdef STM32F1xx
     return (motor->encoder_tim->CNT >> 2);
+#else
+    return 0;
 #endif /*STM32F1xx*/
 }
 

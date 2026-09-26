@@ -14,7 +14,7 @@
 
 typedef twai_message_t      sbv_can_tx_pkt_t;
 typedef twai_message_t      sbv_can_rx_pkt_t;
-typedef sbv_can_handle_t    uint8_t;
+typedef uint8_t             sbv_can_handle_t;
 
 typedef struct sbv_can_instance_t
 {

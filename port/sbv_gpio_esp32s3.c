@@ -1,5 +1,6 @@
 #include "sbv.h"
 #include "sbv_log.h"
+#include "sbv_rtos.h"
 #include "sbv_gpio_esp32s3.h"
 #ifdef ESP32xx_IDF
 
@@ -47,9 +48,9 @@ sbv_gpio_esp32s3_toggle_pin (uint8_t *unsused, sbv_gpio_num_t gpio_num, uint16_t
         return;
     }
 
-    cur_pin_state = sbv_gpio_esp32s3_read_pin (gpio_num);
+    cur_pin_state = gpio_get_level (gpio_num);
 
-    sbv_gpio_esp32s3_set_pin_level (gpio_num, (! cur_pin_state));
+    gpio_set_level (gpio_num, (! cur_pin_state));
     sbv_rtos_task_delay (delay_tick);
 }
 #endif /* ESP32xx_IDF */

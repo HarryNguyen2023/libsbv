@@ -4,6 +4,8 @@
 #include "sbv.h"
 #include "sbv_log.h"
 #include "sbv_rtos.h"
+#include "sbv_gpio.h"
+#include "sbv_uart.h"
 #include "sbv_uart_esp32s3.h"
 
 #ifdef ESP32xx_IDF

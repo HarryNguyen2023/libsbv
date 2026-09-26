@@ -16,13 +16,13 @@ sbv_system_hw_cb_t sbv_system_hw_cb = {
 #endif /* STM32F1xx */
 };
 
-uint32_t
-sbv_system_get_uid (void) {
+int
+sbv_system_get_uid (uint32_t uid[]) {
     if (sbv_system_hw_cb.sbv_system_get_uid) {
-        return (sbv_system_hw_cb.sbv_system_get_uid) ();
+        return (sbv_system_hw_cb.sbv_system_get_uid) (uid);
     }
 
-    return 0;
+    return -1;
 }
 
 void

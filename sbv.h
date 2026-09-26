@@ -25,8 +25,8 @@
 #define SBV_BUSY    2u
 #define SBV_TIMEOUT 3u
 
-#define SBV_TRUE    TRUE
-#define SBV_FALSE   FALSE
+#define SBV_TRUE    1u
+#define SBV_FALSE   0u
 
 #else 
 #define SBV_OK      0u

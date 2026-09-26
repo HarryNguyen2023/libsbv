@@ -6,9 +6,12 @@
 #include "sbv_log.h"
 #include "sbv_system_stm32f1xx.h"
 
-uint32_t
-sbv_system_stm32f1xx_get_uid (void) {
-    return HAL_GetUIDw0() ^ HAL_GetUIDw1() ^ HAL_GetUIDw2();
+int
+sbv_system_stm32f1xx_get_uid (uint32_t uid[]) {
+    uid[0] = HAL_GetUIDw0();
+    uid[1] = HAL_GetUIDw1();
+    uid[2] = HAL_GetUIDw2();
+    return 0;
 }
 
 void
