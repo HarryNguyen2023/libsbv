@@ -1,8 +1,6 @@
 #ifndef __SBV_GPIO_ESP32S3_H__
 #define __SBV_GPIO_ESP32S3_H__
 
-#include "sbv.h"
-
 #ifdef ESP32xx_IDF
 #include "driver/gpio.h"
 
