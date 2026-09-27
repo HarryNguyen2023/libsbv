@@ -23,6 +23,6 @@ typedef struct sbv_ota_installer_t
 void
 sbv_ota_update_init(void *param);
 int
-sbv_ota_ipc_queue_init (sbv_ota_ipc_t *ipc);
+sbv_ota_ipc_queue_init (sbv_ota_ipc_t *ipc, uint8_t is_master);
 
 #endif /*SBV_OTA_H*/

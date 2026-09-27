@@ -4,6 +4,7 @@
 typedef struct sbv_ota_msg_master_handler_t
 {
   sbv_cqbuff*             data_queue;
+  uint8_t                 data[sizeof(sbv_ota_system_msg_t)];
 
   sbv_ota_state_t         state;
   sbv_ota_state_t         next_state;
@@ -21,6 +22,6 @@ typedef struct sbv_ota_msg_master_handler_t
 } sbv_ota_msg_master_handler_t;
 
 void
-sbv_ota_master_fsm_init (void);
+sbv_ota_master_fsm_init (void *param);
 
 #endif /* SBV_OTA_MASTER_FSM_H */

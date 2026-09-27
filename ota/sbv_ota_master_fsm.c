@@ -29,6 +29,7 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data);
 void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data);
 void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data);
 
+void sbv_ota_master_fsm_handle_triggered (void);
 void sbv_ota_master_fsm_handle_state (void *data);
 void sbv_task_ota_update_fw_master (void* param);
 int sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms);
@@ -39,7 +40,6 @@ sbv_rtos_static_task_t       sbv_ota_master_handle;
 
 sbv_ota_msg_master_handler_t sbv_ota_msg_master_handler;
 
-sbv_rtos_queue_handle_t sbv_ota_master_rx_queue;
 static uint8_t rcv_buffer[SBV_OTA_MASTER_RCV_BUFFER_SIZE];
 
 struct sbv_ota_fsm_cb_t sbv_ota_master_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STATE_MAX] = {
@@ -75,11 +75,19 @@ struct sbv_ota_fsm_cb_t sbv_ota_master_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STAT
 };
 
 void
-sbv_ota_master_fsm_init (void)
+sbv_ota_master_fsm_init (void *param)
 {
+    sbv_ota_ipc_t *ipc;
+
     sbv_ota_random_init_unique ();
 
     memset(&sbv_ota_msg_master_handler, 0, sizeof (sbv_ota_msg_master_handler_t));
+
+    ipc = (sbv_ota_ipc_t *)param;
+    if (! ipc) {
+        LOG_ERROR ("Invalid input, OTA IPC queue is nil");
+        return;
+    }
 
     sbv_ota_msg_master_handler.max_retry    = SBV_OTA_MASTER_TX_MAX_RETRY;
     sbv_ota_msg_master_handler.state        = SBV_OTA_STATE_IDLE;
@@ -93,8 +101,7 @@ sbv_ota_master_fsm_init (void)
         return;
     }
 
-    sbv_ota_master_rx_queue                 = sbv_rtos_create_queue (SBV_OTA_MASTER_RX_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
-    sbv_ota_msg_master_handler.rx_queue     = sbv_ota_master_rx_queue;
+    sbv_ota_msg_master_handler.rx_queue     = ipc->to_master_fsm;
 
     sbv_rtos_mutex_create (sbv_ota_msg_master_handler.mu);
 
@@ -162,18 +169,56 @@ sbv_task_ota_update_fw_master (void* param)
 
     for(;;)
     {
-        if (sbv_ota_master_fsm_is_updating_locked())
-        {
+        // Only when received trigger does the FSM start to run
+        if (sbv_ota_master_fsm_is_updating_locked()) {
             sbv_ota_master_fsm_handle_state (NULL);
-        }
-        else
-        {
-            // Blocking and waiting for trigger update
-            //
-            // sbv_ota_msg_master_handler.is_updating = SBV_TRUE;
-            // sbv_ota_msg_master_handler.next_state  = SBV_OTA_STATE_START;
+        } else {
+            // Blocking on receiving trigger update notification from Slave FSM task
+            sbv_ota_master_fsm_handle_triggered();
             sbv_rtos_task_delay (sbv_rtos_ms_to_tick (delay_ms));
         }
+    }
+}
+
+void
+sbv_ota_master_fsm_handle_triggered (void) {
+    sbv_rtos_base_type_t status;
+    sbv_ota_system_msg_t *rcv_msg;
+
+    status = sbv_rtos_queue_rcv(sbv_ota_msg_master_handler.rx_queue,
+                                sbv_ota_msg_master_handler.data,
+                                portMAX_DELAY);
+    if (status != SBV_RTOS_TRUE) {
+        LOG_ERROR ("Failed to received OTA Master FSM trigger message");
+        return;
+    }
+
+    if (sbv_ota_master_fsm_is_updating_locked ()) {
+        LOG_WARN ("Master FSM is in updating process, ignore incoming notification");
+        return;
+    }
+
+    rcv_msg = (sbv_ota_system_msg_t *)(sbv_ota_msg_master_handler.data);
+    if (rcv_msg == NULL)
+    {
+        LOG_ERROR ("Empty OTA update process msg, no further processing");
+        return;
+    }
+
+    switch (rcv_msg->event) {
+    case SBV_OTA_EVENT_UDP_START:
+        sbv_rtos_mutex_lock (sbv_ota_msg_master_handler.mu);
+
+        sbv_ota_msg_master_handler.is_updating = SBV_TRUE;
+        sbv_ota_msg_master_handler.next_state  = SBV_OTA_STATE_START;
+
+        LOG_INFO ("Receiving triggered notification, Master FSM is updating");
+
+        sbv_rtos_mutex_unlock (sbv_ota_msg_master_handler.mu);
+        break;
+    default:
+        LOG_WARN ("Invalid Master OTA system msg, aborting processing");
+        return;
     }
 }
 

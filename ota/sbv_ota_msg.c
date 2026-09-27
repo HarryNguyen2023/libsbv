@@ -418,8 +418,10 @@ ERR_EXIT:
 }
 
 int
-sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue, void *packet, uint8_t rcv_buffer[],
-                          uint16_t buffer_size, int data_size, uint32_t timeout_ms)
+sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue,
+                          void *packet, uint8_t rcv_buffer[],
+                          uint16_t buffer_size, int data_size,
+                          uint32_t timeout_ms)
 {
     int ret, data_len;
     uint32_t start_tick = sbv_rtos_get_tick();

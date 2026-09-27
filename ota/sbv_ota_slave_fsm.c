@@ -17,18 +17,20 @@
 #define SBV_OTA_SLAVE_MSG_TIMEOUT_MS    100
 #define SBV_OTA_BLOCKING_MAX_DELAY_MS   (UINT32_MAX)
 
+#define SBV_OTA_SLAVE_MSG_MAX_RETRY     3
+
 #define SBV_OTA_SLAVE_SYSTEM_MSG_TX_TIMEOUT_MS  100
 #define SBV_OTA_SLAVE_SYSTEM_MSG_RX_TIMEOUT_MS  (2 * 1000)
 
-#define SBV_OTA_SLAVE_NEXT_STATE(NS,RET,RESP)   \
-    (RET!=SBV_OK) ? SBV_OTA_STATE_IDLE :        \
+#define SBV_OTA_SLAVE_NEXT_STATE(CS,NS,RET,RESP)   \
+    ((RET)!=SBV_OK) ? (((RET)==SVB_OTA_SEQ_DUP) ? CS : SBV_OTA_STATE_IDLE) \
         (((RESP)!=SBV_OTA_ACK) ? SBV_OTA_STATE_IDLE : NS)
 
-void sbv_ota_slave_fsm_idle (sbv_ota_state_t current_state, void *data);
-void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data);
-void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data);
-void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data);
-void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data);
+int sbv_ota_slave_fsm_idle (sbv_ota_state_t current_state, void *data);
+int sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data);
+int sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data);
+int sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data);
+int sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data);
 void sbv_ota_slave_fsm_handle_state (void *data);
 
 int sbv_ota_slave_fsm_start_fw_update (void);
@@ -108,16 +110,20 @@ sbv_ota_slave_fsm_init (void* param)
 
     memset(&sbv_ota_msg_slave_handler, 0, sizeof (sbv_ota_msg_slave_handler_t));
 
+    ipc = (sbv_ota_ipc_t *)param;
+    if (! ipc) {
+        LOG_ERROR ("Invalid input, OTA IPC queue is nil");
+        return;
+    }
+
     sbv_ota_msg_slave_handler.state             = SBV_OTA_STATE_IDLE;
     sbv_ota_msg_slave_handler.next_state        = SBV_OTA_STATE_START;
     sbv_ota_msg_slave_handler.is_updating       = SBV_FALSE;
     sbv_ota_msg_slave_handler.is_update_enable  = SBV_TRUE;
 
     sbv_ota_msg_slave_handler.data_queue = sbv_cqbuff_create (SBV_OTA_SLAVE_RCV_BUFFER_SIZE, 1);
-
-    ipc = (sbv_ota_ipc_t *)param;
-    if (! ipc) {
-        LOG_ERROR ("Invalid input, OTA IPC queue is nil");
+    if (! sbv_ota_msg_slave_handler.data_queue) {
+        LOG_ERROR ("Failed to allocate memory for the Slave FSM task data queue");
         return;
     }
 
@@ -142,7 +148,7 @@ sbv_ota_slave_fsm_reset (void)
 
     sbv_cqbuff_flush (sbv_ota_msg_slave_handler.data_queue);
 
-    LOG_INFO ("Resetting the OTA Slave FSM task stack...");
+    LOG_INFO ("Moving back to IDLE state, resetting the OTA Slave FSM task stack...");
 }
 
 static uint8_t
@@ -184,12 +190,16 @@ sbv_task_ota_update_fw_slave (void* param)
 
     for(;;)
     {
+        // Waiting for msg from Master FSM on Master device on every state
+        // Blocking for receiving the cmd start msg from Master
         sbv_ota_slave_fsm_handle_state (NULL);
     }
 }
 
-void sbv_ota_slave_fsm_handle_state (void *data)
+void
+sbv_ota_slave_fsm_handle_state (void *data)
 {
+    int ret;
     sbv_ota_state_t current_state, next_state;
 
     sbv_rtos_mutex_lock (sbv_ota_msg_slave_handler.mu);
@@ -197,6 +207,8 @@ void sbv_ota_slave_fsm_handle_state (void *data)
     current_state = sbv_ota_slave_fsm_get_current_state();
     next_state    = sbv_ota_slave_fsm_get_next_state();
 
+    // The firmware installer is going to resetting the device
+    // Blocking from any further processing of Slave FSM task
     if (! sbv_ota_slave_fsm_is_update_enable ()) {
         LOG_ERROR ("OTA update is disabled, aborting to run OTA Slave FSM process");
         sbv_rtos_mutex_unlock (sbv_ota_msg_slave_handler.mu);
@@ -205,16 +217,26 @@ void sbv_ota_slave_fsm_handle_state (void *data)
         return;
     }
 
-    if (next_state == SBV_OTA_STATE_IDLE) {
+    // Reset when transit from any other state to IDLE
+    if (current_state != SBV_OTA_STATE_IDLE
+        && next_state == SBV_OTA_STATE_IDLE) {
         sbv_ota_slave_fsm_reset ();
-        sbv_rtos_mutex_unlock (sbv_ota_msg_slave_handler.mu);
-        return;
+
+        goto EXIT;
     }
 
-    sbv_ota_fsm_handle_state (sbv_ota_slave_fsm_state,
-                              current_state, next_state, data);
+    ret = sbv_ota_fsm_handle_state (sbv_ota_slave_fsm_state,
+                                    current_state, next_state, data);
+    if (ret != SBV_OK) {
+        LOG_ERROR ("Failed executing state transition cb from current state %s to next state %s",
+                   sbv_ota_fsm_state_to_string(current_state),
+                   sbv_ota_fsm_state_to_string(next_state));
+
+        goto EXIT;
+    }
     sbv_ota_msg_slave_handler.state = next_state;
 
+EXIT:
     sbv_rtos_mutex_unlock (sbv_ota_msg_slave_handler.mu);
 }
 
@@ -222,9 +244,12 @@ int
 sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeout_ms)
 {
     int ret;
+    uint8_t is_duplicate_data_pkt;
     sbv_ota_cmd_pkt_t cmd_pkt;
+
     sbv_ota_msg_slave_handler_t *slave_handler;
 
+    is_duplicate_data_pkt = SBV_FALSE;
     memset(&cmd_pkt, 0, sizeof(sbv_ota_cmd_pkt_t));
 
     slave_handler = (sbv_ota_msg_slave_handler_t *)param;
@@ -243,6 +268,12 @@ sbv_ota_slave_fsm_handle_cmd(void *param, sbv_ota_cmd_t cmd_type, uint32_t timeo
 
     ret = sbv_ota_packet_header_validate (&(cmd_pkt.h), SBV_OTA_PACKET_TYPE_CMD);
     if (ret != SBV_OK) {
+        if (cmd_type == SBV_OTA_CMD_END) {
+            // There is a case where response when receiving the last DATA package 
+            // did not reach the master yet, so it will retry sending that msg to us
+            ret = sbv_ota_packet_header_validate (&(cmd_pkt.h), SBV_OTA_PACKET_TYPE_DATA);
+            if (ret == SBV_OK) 
+        }
         LOG_ERROR ("Failed to validate SBV OTA packet header, aborting handle cmd packet process");
         return ret;
     }
@@ -400,64 +431,81 @@ ERR_EXIT:
 }
 
 
-void sbv_ota_slave_fsm_idle (sbv_ota_state_t current_state, void *data)
+int
+sbv_ota_slave_fsm_idle (sbv_ota_state_t current_state, void *data)
 {
     /* Do nothing */
-    return;
+    return SBV_OK;
 }
 
-void sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
+int
+sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
 {
     int ret;
-    uint8_t resp_type;
+    uint8_t resp_type, i;
 
     if (current_state != SBV_OTA_STATE_IDLE)
     {
+        LOG_ERROR ("Invalid current state %s is not IDLE, transitting back to IDLE",
+                    sbv_ota_fsm_state_to_string(current_state));
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
-    ret = sbv_ota_slave_fsm_handle_cmd(&sbv_ota_msg_slave_handler, SBV_OTA_CMD_START, SBV_OTA_BLOCKING_MAX_DELAY_MS);
+    ret = sbv_ota_slave_fsm_handle_cmd(&sbv_ota_msg_slave_handler,
+                                       SBV_OTA_CMD_START,
+                                       SBV_OTA_BLOCKING_MAX_DELAY_MS);
     if (ret != SBV_OK) {
-        if (ret == SVB_OTA_SEQ_DUP) {
-            LOG_WARN ("Received duplication cmd start packet, sending ACK to OTA Master FSM");
-        } else {
-            LOG_ERROR ("Failed to handle cmd start packet, sending NACK to OTA Master FSM");
-        }
+        LOG_ERROR ("Failed to handle cmd start packet, sending NACK to OTA Master FSM");
+    } else if (! sbv_ota_msg_slave_handler.is_updating) {
+        sbv_ota_msg_slave_handler.is_updating = SBV_TRUE;
+
+        LOG_INFO ("Recv OTA cmd Start, Slave FSM start update process...");
     }
 
-    sbv_ota_msg_slave_handler.is_updating = SBV_TRUE;
+    resp_type = (ret == SBV_OK) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-    resp_type = (ret == SBV_OK || ret == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
-
+    // Only increase the sequence number when receiving a valid cmd Start packet
     sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
-    ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-    if (ret != SBV_OK) {
+    for (i = 0; i < SBV_OTA_SLAVE_MSG_MAX_RETRY; ++i) {
+        ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num,
+                                     SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+        if (ret == SBV_OK) {
+            break;
+        }
         LOG_ERROR ("Failed to send response packet to OTA Master FSM");
     }
 
-    sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE (SBV_OTA_STATE_HEADER, ret, resp_type);
+    sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE(SBV_OTA_STATE_START,
+                                                                    SBV_OTA_STATE_HEADER,
+                                                                    ret, resp_type);
 
-    return;
+    return SBV_OK;
 }
 
-void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
+int
+sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
 {
     int ret;
-    uint8_t resp_type;
+    uint8_t resp_type, i;
 
     if (current_state != SBV_OTA_STATE_START
         || ! sbv_ota_slave_fsm_is_updating())
     {
+        LOG_ERROR ("Invalid state transition, current state %s, \
+                    required state START, is updating %s, transitting back to IDLE",
+                    sbv_ota_fsm_state_to_string(current_state),
+                    sbv_ota_slave_fsm_is_updating() ? "True" : "False");
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
-    ret = sbv_ota_slave_fsm_handle_header (&sbv_ota_msg_slave_handler, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    ret = sbv_ota_slave_fsm_handle_header (&sbv_ota_msg_slave_handler,
+                                           SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         if (ret == SVB_OTA_SEQ_DUP) {
-            LOG_WARN ("Received duplication header packet, sending ACK to OTA Master FSM");
+            LOG_WARN ("Received duplication cmd start packet, sending ACK to OTA Master FSM");
         } else {
             LOG_ERROR ("Failed to handle header packet, sending NACK to OTA Master FSM");
         }
@@ -465,88 +513,124 @@ void sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
 
     resp_type = (ret == SBV_OK || ret == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
+    // Only increase the sequence number when receiving a valid Header packet
     sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
-    ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-    if (ret != SBV_OK) {
+    for (i = 0; i < SBV_OTA_SLAVE_MSG_MAX_RETRY; ++i) {
+        ret = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num,
+                                     SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+        if (ret == SBV_OK) {
+            break;
+        }
         LOG_ERROR ("Failed to send response packet to OTA Master FSM");
     }
 
-    sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE (SBV_OTA_STATE_DATA, ret, resp_type);
+    sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE(SBV_OTA_STATE_HEADER,
+                                                                    SBV_OTA_STATE_DATA,
+                                                                    ret, resp_type);
 
-    return;
+    return SBV_OK;
 }
 
 static int
 sbv_ota_slave_validate_rcv_fw_image_crc (void)
 {
-    return (sbv_ota_calculate_crc(sbv_ota_msg_slave_handler.fw_image, sbv_ota_msg_slave_handler.current_rcv_image_size) \
+    return (sbv_ota_calculate_crc(sbv_ota_msg_slave_handler.fw_image,
+                                  sbv_ota_msg_slave_handler.current_rcv_image_size) \
                 == sbv_ota_msg_slave_handler.new_fw_metadata.fw_crc);
 }
 
-void sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
+int
+sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
 {
     int ret1, ret2;
-    uint8_t resp_type;
+    uint8_t resp_type, i;
 
     if (current_state != SBV_OTA_STATE_HEADER
         || ! sbv_ota_slave_fsm_is_updating())
     {
+        LOG_ERROR ("Invalid state transition, current state %s, \
+                    required state HEADER, is updating %s, transitting back to IDLE",
+                    sbv_ota_fsm_state_to_string(current_state),
+                    sbv_ota_slave_fsm_is_updating() ? "True" : "False");
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
     do {
-        ret1 = sbv_ota_slave_fsm_handle_data (&sbv_ota_msg_slave_handler, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+        ret1 = sbv_ota_slave_fsm_handle_data (&sbv_ota_msg_slave_handler,
+                                              SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
         if (ret1 != SBV_BUSY && ret1 != SBV_OK) {
             if (ret1 == SVB_OTA_SEQ_DUP) {
-                LOG_WARN ("Received duplication data packet, sending ACK to OTA Master FSM");
+                LOG_WARN ("Received duplication packet, sending ACK to OTA Master FSM");
             } else {
                 LOG_ERROR ("Failed to handle data packet, sending NACK to OTA Master FSM");
             }
         }
 
-        resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
+        resp_type = (ret1 == SBV_OK || ret1 == SBV_BUSY \
+                         || ret1 == SVB_OTA_SEQ_DUP) ? SBV_OTA_ACK : SBV_OTA_NACK;
 
-        sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK || ret1 == SBV_BUSY) ? SBV_OTA_RESP_PACKET_LEN : 0);
+        // Only increase the sequence number when receiving valid Data packet
+        sbv_ota_msg_slave_handler.seq_num += ((ret1 == SBV_OK \
+                                              || ret1 == SBV_BUSY) ? SBV_OTA_RESP_PACKET_LEN : 0);
 
-        ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-        if (ret2 != SBV_OK)
-        {
+        for (i = 0; i < SBV_OTA_SLAVE_MSG_MAX_RETRY; ++i) {
+            ret2 = sbv_ota_msg_send_resp (resp_type, sbv_ota_msg_slave_handler.seq_num,
+                                          SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+            if (ret2 == SBV_OK) {
+                break;
+            }
             LOG_ERROR ("Failed to send response packet to OTA Master FSM");
+        }
+
+        // Internal error with msg sending system, abort update
+        if (ret2 != SBV_OK) {
+            LOG_ERROR ("Internal msg system error, aborting Slave FSM update...");
+            break;
         }
 
         // Not yet receive all the firmware image, stay at the current DATA state
     } while (ret1 == SBV_BUSY || ret1 == SVB_OTA_SEQ_DUP);
 
-    sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE (SBV_OTA_STATE_END, ret2, resp_type);
+    sbv_ota_msg_slave_handler.next_state = SBV_OTA_SLAVE_NEXT_STATE(SBV_OTA_STATE_DATA,
+                                                                    SBV_OTA_STATE_END,
+                                                                    ret2, resp_type);
 
-    return;
+    return SBV_OK;
 }
 
-void sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
+void
+sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
 {
     int ret;
+    uint8_t i;
     sbv_ota_upd_status upd_status;
 
     if (current_state != SBV_OTA_STATE_DATA
         || ! sbv_ota_slave_fsm_is_updating())
     {
+        LOG_ERROR ("Invalid state transition, current state %s, \
+                    required state HEADER, is updating %s, transitting back to IDLE",
+                    sbv_ota_fsm_state_to_string(current_state),
+                    sbv_ota_slave_fsm_is_updating() ? "True" : "False");
         sbv_ota_msg_slave_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
-    ret = sbv_ota_slave_fsm_handle_cmd(&sbv_ota_msg_slave_handler, SBV_OTA_CMD_END, SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+    ret = sbv_ota_slave_fsm_handle_cmd (&sbv_ota_msg_slave_handler,
+                                        SBV_OTA_CMD_END,
+                                        SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
     if (ret != SBV_OK) {
         if (ret == SVB_OTA_SEQ_DUP) {
-            LOG_WARN ("Received duplication cmd end packet, sending ACK to OTA Master FSM");
+            LOG_WARN ("Received duplication data packet, sending ACK to OTA Master FSM");
         } else {
             LOG_ERROR ("Failed to handle cmd end packet, sending NACK to OTA Master FSM");
         }
         goto SEND_REPORT;
     }
 
-    // Verify the whole image hash CRC
+    // Verify the image integrity
     if (sbv_ota_slave_validate_rcv_fw_image_crc () != SBV_TRUE) {
         LOG_ERROR ("Failed to validate fw image CRC, aborting fw update process");
         ret = SBV_ERROR;
@@ -563,10 +647,13 @@ SEND_REPORT:
 
     sbv_ota_msg_slave_handler.seq_num += ((ret == SBV_OK) ? SBV_OTA_REP_PACKET_LEN : 0);
 
-    ret = sbv_ota_msg_send_report (upd_status, sbv_ota_msg_slave_handler.seq_num,
-                                   &(sbv_ota_msg_slave_handler.new_fw_metadata),
-                                   SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
-    if (ret != SBV_OK) {
+    for (i = 0; i < SBV_OTA_SLAVE_MSG_MAX_RETRY; ++i) {
+        ret = sbv_ota_msg_send_report (upd_status, sbv_ota_msg_slave_handler.seq_num,
+                                       &(sbv_ota_msg_slave_handler.new_fw_metadata),
+                                       SBV_OTA_SLAVE_MSG_TIMEOUT_MS);
+        if (ret == SBV_OK) {
+            break;
+        }
         LOG_ERROR ("Failed to send report packet to OTA Master FSM");
     }
 
@@ -574,7 +661,7 @@ SEND_REPORT:
 
     sbv_ota_msg_slave_handler.is_updating = SBV_FALSE;
 
-    return;
+    return SBV_OK;
 }
 
 int

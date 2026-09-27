@@ -54,7 +54,7 @@ extern sbv_can_handle_t     hcan;
 sbv_can_instance_t          sbv_can_instance;
 
 #ifdef ESP32xx_IDF
-sbv_ota_ipc_t   sbv_ota_queues;
+sbv_ota_ipc_t               sbv_ota_queues;
 #endif /* ESP32xx_IDF */
 
 void sbv_led_init_blink (void);
@@ -196,11 +196,12 @@ sbv_task_debug_console_task(void *param)
     }
 }
 
+#ifdef ESP32xx_IDF
 void
 sbv_task_ota_init (uint8_t is_master) {
     int ret;
 
-    ret = sbv_ota_ipc_queue_init (&sbv_ota_queues);
+    ret = sbv_ota_ipc_queue_init (&sbv_ota_queue, is_master);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to initiate IPC queue for OTA tasks");
         return;
@@ -213,3 +214,4 @@ sbv_task_ota_init (uint8_t is_master) {
         sbv_ota_master_fsm_init ();
     }
 }
+#endif /* ESP32xx_IDF */

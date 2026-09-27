@@ -26,16 +26,18 @@ void sbv_ota_update_fw_thread (void *param);
 sbv_ota_installer_t sbv_ota_installer;
 
 int
-sbv_ota_ipc_queue_init (sbv_ota_ipc_t *ipc) {
+sbv_ota_ipc_queue_init (sbv_ota_ipc_t *ipc, uint8_t is_master) {
     if (! ipc) {
-        LOG_ERROR ("Invlaid input: OTA IPC queue is nil");
+        LOG_ERROR ("Invalid input: OTA IPC queue is nil");
         return SBV_ERROR;
     }
 
     ipc->to_installer = sbv_rtos_create_queue (SBV_OTA_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
     ipc->to_slave_fsm = sbv_rtos_create_queue (SBV_OTA_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
+    if (is_master)
+        ipc->to_master_fsm = sbv_rtos_create_queue (SBV_OTA_QUEUE_LEN, sizeof (sbv_ota_system_msg_t));
 
-    return (ipc->to_installer && ipc->to_slave_fsm) ? SBV_OK : SBV_ERROR;
+    return ((! ipc->to_installer) || (! ipc->to_slave_fsm) || (is_master && (! ipc->to_master_fsm))) ? SBV_ERROR : SBV_OK;
 }
 
 void
@@ -53,7 +55,7 @@ sbv_ota_update_init(void *param)
 
     ipc = (sbv_ota_ipc_t *)param;
     if (! ipc) {
-        LOG_ERROR ("Invlaid input: OTA IPC queue is nil");
+        LOG_ERROR ("Invalid input: OTA IPC queue is nil");
         return;
     }
     sbv_ota_installer.rx_queue = ipc->to_installer;
@@ -471,7 +473,6 @@ void
 sbv_ota_update_fw_thread (void *param)
 {
     int ret;
-
     sbv_rtos_base_type_t status;
     sbv_rtos_tick_type_t tick_to_wait;
 

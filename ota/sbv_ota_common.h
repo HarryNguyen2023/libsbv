@@ -108,6 +108,7 @@ typedef struct sbv_ota_system_msg_t
 typedef struct sbv_ota_ipc_t {
   sbv_rtos_queue_handle_t to_installer;
   sbv_rtos_queue_handle_t to_slave_fsm;
+  sbv_rtos_queue_handle_t to_master_fsm;
 } sbv_ota_ipc_t;
 
 int
