@@ -15,7 +15,7 @@ sbv_cqbuff *sbv_cqbuff_create (int capacity, int element_size)
   if (!capacity || !element_size)
     return NULL;
 
-  new_buf = (sbv_cqbuff *)sbv_rtos_malloc(sizeof (sbv_cqbuff) + capacity);
+  new_buf = (sbv_cqbuff *)sbv_rtos_malloc(sizeof(sbv_cqbuff) + capacity);
   if (! new_buf)
   {
     LOG_ERROR ("Failed to allocate memory for circular buffer");
@@ -73,7 +73,7 @@ int sbv_cqbuff_avail_size (sbv_cqbuff* buff)
 int sbv_cqbuff_get_size (sbv_cqbuff* buff)
 {
   if (! buff)
-    return -1;
+    return SBV_ERROR;
 
   return buff->capacity - sbv_cqbuff_avail_size(buff);
 }
@@ -184,4 +184,12 @@ void sbv_cqbuff_flush (sbv_cqbuff *buff)
 
   buff->head = -1;
   buff->rear = -1;
+}
+
+uint8_t* sbv_cqbuff_head(sbv_cqbuff *buff)
+{
+  if (! buff || sbv_cqbuff_is_empty(buff))
+    return NULL;
+
+  return buff->buff + buff->head;
 }

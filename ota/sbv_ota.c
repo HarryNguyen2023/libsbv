@@ -65,8 +65,8 @@ sbv_ota_update_init(void *param)
 
     LOG_INFO ("Initializing OTA fw installer task...");
 
-    sbv_rtos_task_create(sbv_ota_update_fw_thread, "update_fw", STACK_SIZE_BASE * 4,
-                         NULL, SBV_OTA_UPDATE_FW_PRIO, sbv_ota_fw_update_stack, &sbv_ota_update_fw_handle);
+    sbv_rtos_task_create_static(sbv_ota_update_fw_thread, "update_fw", STACK_SIZE_BASE * 4,
+                                NULL, SBV_OTA_UPDATE_FW_PRIO, sbv_ota_fw_update_stack, &sbv_ota_update_fw_handle);
 }
 
 uint8_t
@@ -152,14 +152,14 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
     if (! sbv_ota_is_valid_fw_slot (image_slot) || slot_metadata == NULL)
     {
         LOG_ERROR ("Invalid OTA image slot %u", image_slot);
-        return -1;
+        return SBV_ERROR;
     }
 
     /* Read the configuration in flash memory space */
     ret = sbv_ota_cfg_read_and_validate (&cfg);
     if (ret != SBV_OK) {
         LOG_ERROR ("Invalid OTA configuration read");
-        return -1;
+        return SBV_ERROR;
     }
 
     if (is_image_valid)
@@ -183,7 +183,7 @@ sbv_ota_save_fw_img_cfg (uint16_t image_slot, sbv_ota_fw_metadata_t* slot_metada
     if (ret != SBV_OK)
     {
         LOG_ERROR ("Failed to commit new OTA configuration data");
-        return -1;
+        return SBV_ERROR;
     }
 
     return 0;
@@ -459,7 +459,7 @@ sbv_ota_process_update_fw_cmd (void)
 
 ERR_EXIT:
     sbv_rtos_mutex_unlock(sbv_ota_installer.mutex);
-    return -1;
+    return SBV_ERROR;
 }
 
 /*
@@ -482,8 +482,9 @@ sbv_ota_update_fw_thread (void *param)
     {
         // To protect against partial firmware update attack, we use a simple
         // watchdog timer mechanism to abort the upate process if the next event
-        // does not arrive in time.
-        tick_to_wait = sbv_ota_is_updating_locked() ? sbv_rtos_ms_to_tick(SBV_OTA_UPDATE_WATCHDOG_MS) : portMAX_DELAY;
+        // does not arrive in time when the firmware update process has been triggered.
+        tick_to_wait = sbv_ota_is_updating_locked() ? \
+                        sbv_rtos_ms_to_tick(SBV_OTA_UPDATE_WATCHDOG_MS) : portMAX_DELAY;
 
         status = sbv_rtos_queue_rcv(sbv_ota_installer.rx_queue, sbv_ota_installer.data, tick_to_wait);
         if (status != SBV_RTOS_TRUE)

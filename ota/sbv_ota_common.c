@@ -72,7 +72,7 @@ int
 sbv_ota_cfg_read_and_validate (sbv_ota_general_cfg_t *c) {
     if (! c) {
         LOG_ERROR ("Input OTA general config struct is nil");
-        return -1;
+        return SBV_ERROR;
     }
 
     sbv_ota_cfg_read (c);
@@ -193,13 +193,13 @@ sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
 	sbv_ota_general_cfg_t cfg;
 
     if (! current_fw_medata)
-        return -1;
+        return SBV_ERROR;
 
     /* Read the configuration in flash memory space */
     ret = sbv_ota_cfg_read_and_validate (&cfg);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to read and validate the current OTA general config on Flash");
-        return -1;
+        return SBV_ERROR;
     }
 
     for (i = 0; i < SBV_OTA_SLOT_NO; ++i)
@@ -213,7 +213,7 @@ sbv_ota_get_current_fw_metadata (sbv_ota_fw_metadata_t* current_fw_medata)
     }
 
     if (! found)
-        return -1;
+        return SBV_ERROR;
 
     return 0;
 }
@@ -323,7 +323,7 @@ sbv_ota_send_system_msg (sbv_rtos_queue_handle_t queue, sbv_ota_system_msg_event
     status = sbv_rtos_queue_send (queue, &msg, tick_to_wait);
     if (status != SBV_RTOS_TRUE) {
         LOG_ERROR ("Failed to send OTA system message, event=%u", event);
-        return -1;
+        return SBV_ERROR;
     }
 
     return SBV_OK;
@@ -408,7 +408,7 @@ int
 sbv_ota_fw_version_compare(const sbv_ota_fw_version_t *v1, const sbv_ota_fw_version_t *v2)
 {
     if (! v1 || ! v2) {
-        return -1;
+        return SBV_ERROR;
     }
 
     if (v1->major != v2->major)

@@ -33,6 +33,7 @@
 #define SBV_OTA_FW_TIME_LENGTH      20
 
 #define SVB_OTA_SEQ_DUP             (-3)
+#define SVB_OTA_PKT_TYPE_MISMATCH   (-4)
 
 typedef struct sbv_ota_fw_version_t
 {

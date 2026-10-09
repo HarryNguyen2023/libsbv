@@ -264,7 +264,7 @@ sbv_uart_stm32f1xx_register_rx_cb (sbv_uart_instance_t* uart_instance,
 {
     if (! uart_rx_cb || ! uart_instance) {
         LOG_ERROR ("Invalid input, failed to register UART receive cb");
-        return -1;
+        return SBV_ERROR;
     }
 
     SBV_UART_MUTEX_LOCK (uart_instance);

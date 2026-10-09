@@ -9,7 +9,7 @@
 #define SBV_OTA_NACK	0x01	/* NACK */
 
 #define SBV_OTA_DATA_MAX_SIZE     (1024)
-#define SBV_OTA_DATA_OVERHEAD     (10)
+#define SBV_OTA_DATA_OVERHEAD     (sizeof(sbv_ota_pkt_common_header_t))
 #define SBV_OTA_PACKET_MAX_SIZE   (SBV_OTA_DATA_MAX_SIZE + SBV_OTA_DATA_OVERHEAD)
 
 /* SBV OTA Packet type */
@@ -149,7 +149,16 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
 int
 sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cmd_type, uint16_t* seq_num);
 int
-sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue, void *packet, uint8_t rcv_buffer[],
-                          uint16_t buffer_size, int data_size, uint32_t timeout_ms);
+sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue,
+                          void *packet, int data_size, uint32_t timeout_ms);
+int
+sbv_ota_send_resp_with_retry (uint8_t resp_type, uint16_t seq_num,
+                              uint8_t retry_num, uint16_t timeout_ms);
+int
+sbv_ota_send_report_with_retry (const sbv_ota_upd_status upd_status,
+                                const sbv_ota_fw_metadata_t *fw_metadata,
+                                uint16_t seq_num, uint8_t retry_num, uint16_t timeout_ms);
+char *
+sbv_ota_msg_type_to_str (uint8_t packet_type);
 
 #endif /*SBV_OTA_MSG_H*/

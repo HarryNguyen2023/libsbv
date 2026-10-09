@@ -20,5 +20,6 @@ void sbv_cqbuff_dump (sbv_cqbuff *buff, void (*sbv_cqbuff_element_print)(void *)
 int sbv_cqbuff_avail_size (sbv_cqbuff* buff);
 int sbv_cqbuff_get_size (sbv_cqbuff* buff);
 void sbv_cqbuff_flush (sbv_cqbuff* buff);
+uint8_t* sbv_cqbuff_head(sbv_cqbuff *buff);
 
 #endif /* __SBV_CIRCULAR_BUFFER_H__ */

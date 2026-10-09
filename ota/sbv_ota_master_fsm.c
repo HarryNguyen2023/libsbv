@@ -23,11 +23,11 @@
     ((T) == SBV_OTA_MASTER_TX_MAX_RETRY) ? SBV_OTA_STATE_IDLE : \
         (((ACK)!=SBV_TRUE) ? SBV_OTA_STATE_IDLE : NS)
 
-void sbv_ota_master_fsm_idle (sbv_ota_state_t current_state, void *data);
-void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data);
-void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data);
-void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data);
-void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data);
+int sbv_ota_master_fsm_idle (sbv_ota_state_t current_state, void *data);
+int sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data);
+int sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data);
+int sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data);
+int sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data);
 
 void sbv_ota_master_fsm_handle_triggered (void);
 void sbv_ota_master_fsm_handle_state (void *data);
@@ -39,8 +39,6 @@ static sbv_rtos_stack_type_t sbv_ota_master_fsm_stack[STACK_SIZE_BASE * 4];
 sbv_rtos_static_task_t       sbv_ota_master_handle;
 
 sbv_ota_msg_master_handler_t sbv_ota_msg_master_handler;
-
-static uint8_t rcv_buffer[SBV_OTA_MASTER_RCV_BUFFER_SIZE];
 
 struct sbv_ota_fsm_cb_t sbv_ota_master_fsm_state[SBV_OTA_STATE_MAX][SBV_OTA_STATE_MAX] = {
     {{SBV_OTA_STATE_IDLE,   sbv_ota_master_fsm_idle},
@@ -105,7 +103,7 @@ sbv_ota_master_fsm_init (void *param)
 
     sbv_rtos_mutex_create (sbv_ota_msg_master_handler.mu);
 
-    sbv_rtos_task_create(sbv_task_ota_update_fw_master, "ota_master", STACK_SIZE_BASE * 4,
+    sbv_rtos_task_create_static(sbv_task_ota_update_fw_master, "ota_master", STACK_SIZE_BASE * 4,
                          NULL, SBV_OTA_MASTER_PRIO, sbv_ota_master_fsm_stack, &sbv_ota_master_handle);
 }
 
@@ -250,21 +248,21 @@ void sbv_ota_master_fsm_handle_state (void *data)
     sbv_rtos_mutex_unlock (sbv_ota_msg_master_handler.mu);
 }
 
-void sbv_ota_master_fsm_idle (sbv_ota_state_t current_state, void *data)
+int sbv_ota_master_fsm_idle (sbv_ota_state_t current_state, void *data)
 {
     /* Do nothing */
-    return;
+    return SBV_OK;
 }
 
-void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
+int sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
 {
-    int ret;
+    int ret = SBV_OK;
     uint8_t retry_time;
 
     if (current_state != SBV_OTA_STATE_IDLE)
     {
         sbv_ota_msg_master_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
     sbv_ota_msg_master_handler.seq_num = sbv_ota_get_random_seq_number ();
@@ -303,19 +301,19 @@ void sbv_ota_master_fsm_start (sbv_ota_state_t current_state, void *data)
     sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE (SBV_OTA_STATE_HEADER,
                                                                        retry_time,
                                                                        sbv_ota_master_fsm_is_acknowledged());
-    return;
+    return ret;
 }
 
-void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
+int sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
 {
-    int ret;
+    int ret = SBV_OK;
     uint8_t retry_time, *images;
     sbv_ota_fw_metadata_t data_info;
 
     if (current_state != SBV_OTA_STATE_START)
     {
         sbv_ota_msg_master_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
     // TODO: Read the images data from the filesystem
@@ -358,20 +356,19 @@ void sbv_ota_master_fsm_header (sbv_ota_state_t current_state, void *data)
     sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE (SBV_OTA_STATE_DATA,
                                                                        retry_time,
                                                                        sbv_ota_master_fsm_is_acknowledged());
-
-    return;
+    return ret;
 }
 
-void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
+int sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
 {
-    int ret;
+    int ret = SBV_OK;
     uint8_t retry_time, *images;
     uint16_t image_length, chunk_length;
 
     if (current_state != SBV_OTA_STATE_HEADER)
     {
         sbv_ota_msg_master_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
     // Read the images from the filesystem
@@ -424,19 +421,18 @@ void sbv_ota_master_fsm_data (sbv_ota_state_t current_state, void *data)
     sbv_ota_msg_master_handler.next_state = SBV_OTA_MASTER_NEXT_STATE(SBV_OTA_STATE_END,
                                                                       retry_time,
                                                                       sbv_ota_master_fsm_is_acknowledged());
-
-    return;
+    return ret;
 }
 
-void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
+int sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
 {
-    int ret;
+    int ret = SBV_OK;
     uint8_t retry_time;
 
     if (current_state != SBV_OTA_STATE_DATA)
     {
         sbv_ota_msg_master_handler.next_state = SBV_OTA_STATE_IDLE;
-        return;
+        return SBV_ERROR;
     }
 
     sbv_ota_msg_master_handler.seq_num += SBV_OTA_CMD_PACKET_LEN;
@@ -469,7 +465,7 @@ void sbv_ota_master_fsm_end (sbv_ota_state_t current_state, void *data)
                                                                        sbv_ota_master_fsm_is_acknowledged());
     sbv_ota_msg_master_handler.is_updating = SBV_FALSE;
 
-    return;
+    return ret;
 }
 
 int
@@ -484,11 +480,10 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
     master_handler = (sbv_ota_msg_master_handler_t *)param;
     if (! master_handler) {
         LOG_ERROR ("Invalid input: OTA master FSM handler is nil, aborting handling response packet");
-        return -1;
+        return SBV_ERROR;
     }
 
     ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(resp_pkt.h),
-                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to get the header of reposne packet from OTA slave FSM");
@@ -502,7 +497,6 @@ sbv_ota_master_fsm_handle_resp(void *param, uint32_t timeout_ms)
     }
 
     ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(resp_pkt.status),
-                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     resp_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to get the status of reposne packet from OTA slave FSM");
@@ -531,11 +525,10 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
     master_handler = (sbv_ota_msg_master_handler_t *)param;
     if (! master_handler) {
         LOG_ERROR ("Invalid input: OTA master FSM handler is nil, aborting handling report packet");
-        return -1;
+        return SBV_ERROR;
     }
 
     ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(report_pkt.h),
-                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     sizeof(sbv_ota_pkt_common_header_t), timeout_ms);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to get the header of report packet from OTA slave FSM");
@@ -549,7 +542,6 @@ sbv_ota_master_fsm_handle_report(void *param, uint32_t timeout_ms)
     }
 
     ret = sbv_ota_msg_get_rcv_data (NULL, master_handler->data_queue, &(report_pkt.status),
-                                    rcv_buffer, SBV_OTA_MASTER_RCV_BUFFER_SIZE,
                                     report_pkt.h.length, timeout_ms);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to get the update status of report packet from OTA slave FSM");

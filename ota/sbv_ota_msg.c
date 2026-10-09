@@ -28,24 +28,22 @@ sbv_ota_msg_hw_cb_t sbv_ota_msg_hw_cb = {
 static int
 sbv_ota_msg_send (uint8_t *data, uint16_t length, uint16_t timeout_ms)
 {
-    if (sbv_ota_msg_hw_cb.sbv_ota_msg_send)
-    {
+    if (sbv_ota_msg_hw_cb.sbv_ota_msg_send) {
         // When sending OTA msg via UART, the first parameters will be ignored
         return (sbv_ota_msg_hw_cb.sbv_ota_msg_send) (SBV_CAN_MSG_OTA, data, length, timeout_ms);
     }
 
-    return 0;
+    return SBV_ERROR;
 }
 
 int
 sbv_ota_rcv_data (void* param, uint8_t data[], uint16_t length, uint32_t timeout_ms)
 {
-    if (sbv_ota_msg_hw_cb.sbv_ota_rcv_data)
-    {
+    if (sbv_ota_msg_hw_cb.sbv_ota_rcv_data) {
         return (sbv_ota_msg_hw_cb.sbv_ota_rcv_data) (param, data, length, timeout_ms);
     }
 
-    return 0;
+    return SBV_ERROR;
 }
 
 int
@@ -56,7 +54,7 @@ sbv_ota_msg_send_resp (uint8_t resp_type, uint16_t seq_num, uint16_t timeout_ms)
 
     if((resp_type != SBV_OTA_ACK) && (resp_type != SBV_OTA_NACK)) {
         LOG_ERROR ("Invalid SBV OTA response type");
-        return -1;
+        return SBV_ERROR;
     }
 
     resp_pkt.h.sof 			= SBV_OTA_SOF;
@@ -124,13 +122,13 @@ sbv_ota_msg_send_data_header(uint8_t *data, sbv_ota_fw_metadata_t* data_info, ui
     uint32_t data_crc, pkt_crc;
 
     if(! data || ! data_info)
-        return -1;
+        return SBV_ERROR;
 
     data_crc = sbv_ota_frame_crc((uint8_t *)data, data_info->fw_size);
     if (data_crc != data_info->fw_crc)
     {
         LOG_ERROR ("Data CRC mismatch, data crc=%x, expected crc=%x", data_crc, data_info->fw_crc);
-        return -1;
+        return SBV_ERROR;
     }
 
     header_pkt.h.sof           = SBV_OTA_SOF;
@@ -154,13 +152,13 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
     int ret;
 
     if(! data || ! data_length)
-        return -1;
+        return SBV_ERROR;
 
 
     if(data_length == 0 || data_length > SBV_OTA_DATA_MAX_SIZE)
     {
         LOG_ERROR ("Invalid data length %d, maximum allowable length %u", data_length, SBV_OTA_DATA_MAX_SIZE);
-        return -1;
+        return SBV_ERROR;
     }
 
     pkt_length = sizeof(sbv_ota_data_pkt_t) + data_length;
@@ -168,7 +166,7 @@ sbv_ota_msg_send_data_frame(uint8_t *data, uint32_t data_length, uint16_t seq_nu
     if(! data_pkt)
     {
         LOG_ERROR ("Failed to allocate memory for data packet");
-        return -1;
+        return SBV_ERROR;
     }
 
     data_pkt->h.sof           = SBV_OTA_SOF;
@@ -200,7 +198,7 @@ ERR:
         sbv_rtos_free(data_pkt);
         data_pkt = NULL;
     }
-    return -1;
+    return SBV_ERROR;
 }
 
 int
@@ -218,18 +216,12 @@ sbv_ota_packet_header_validate (sbv_ota_pkt_common_header_t *header, uint8_t pac
         return SBV_ERROR;
     }
 
-    if(header->packet_type != packet_type)
-    {
-        LOG_ERROR ("Invalid OTA packet header type, type=%u, expected type=%u", header->packet_type, packet_type);
-        return SBV_ERROR;
-    }
-
     if (header->length == 0 || header->length > SBV_OTA_DATA_MAX_SIZE) {
         LOG_ERROR ("Invalid OTA packet length, length=%u, maximum allowable length=%u", header->length, SBV_OTA_DATA_MAX_SIZE);
         return SBV_ERROR;
     }
 
-    switch (packet_type)
+    switch (header->packet_type)
     {
     case SBV_OTA_PACKET_TYPE_CMD:
         pkt_default_length = SBV_OTA_CMD_PACKET_LEN;
@@ -249,7 +241,19 @@ sbv_ota_packet_header_validate (sbv_ota_pkt_common_header_t *header, uint8_t pac
         break;
     }
 
-    return (pkt_default_length && pkt_default_length != header->length) ? SBV_ERROR : SBV_OK;
+    if (pkt_default_length && pkt_default_length != header->length) {
+        LOG_ERROR ("Invalid package length, expected length=%u, actual length=%u",
+                    pkt_default_length, header->length);
+        return SBV_ERROR;
+    }
+
+    if(header->packet_type != packet_type)
+    {
+        LOG_ERROR ("Invalid OTA packet header type, type=%u, expected type=%u", header->packet_type, packet_type);
+        return SVB_OTA_PKT_TYPE_MISMATCH;
+    }
+
+    return SBV_OK;
 }
 
 int
@@ -259,7 +263,7 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
     uint32_t pkt_crc, new_crc;
 
     if (! cmd_pkt)
-        return -1;
+        return SBV_ERROR;
 
     pkt_crc         = cmd_pkt->h.crc;
     cmd_pkt->h.crc  = 0;
@@ -267,7 +271,7 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
     if(pkt_crc != new_crc)
     {
         LOG_ERROR ("Invalid OTA cmd packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
-        goto ERR_EXIT;
+        return SBV_ERROR;
     }
 
     if (cmd_type == SBV_OTA_CMD_START) {
@@ -282,9 +286,6 @@ sbv_ota_msg_rx_cmd_packet_validate (sbv_ota_cmd_pkt_t* cmd_pkt, sbv_ota_cmd_t cm
     }
 
     return (cmd_pkt->cmd == cmd_type) ? SBV_OK : SBV_ERROR;
-
-ERR_EXIT:
-    return -1;
 }
 
 int
@@ -294,7 +295,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     uint32_t pkt_crc, new_crc;
 
     if (! head_pkt)
-        return -1;
+        return SBV_ERROR;
 
     pkt_crc         = head_pkt->h.crc;
     head_pkt->h.crc = 0;
@@ -311,7 +312,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     if (head_pkt->data_info.fw_size == 0 || head_pkt->data_info.fw_size > SBV_OTA_SLOT_MAX_SIZE) {
         LOG_ERROR ("Invalid OTA image size, size=%u, maximum allowable size=%u",
                    head_pkt->data_info.fw_size, SBV_OTA_SLOT_MAX_SIZE);
-        return -1;
+        return SBV_ERROR;
     }
 
     ret = sbv_ota_seq_num_validate (seq_num, head_pkt->h.seq_num, SBV_OTA_HEADER_PACKET_LEN);
@@ -323,7 +324,7 @@ sbv_ota_msg_rx_header_packet_validate (sbv_ota_header_pkt_t* head_pkt, uint16_t*
     return SBV_OK;
 
 ERR_EXIT:
-    return -1;
+    return SBV_ERROR;
 }
 
 int
@@ -333,7 +334,7 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
     uint32_t pkt_crc, new_crc;
 
     if (! data_pkt)
-        return -1;
+        return SBV_ERROR;
 
     pkt_crc         = data_pkt->h.crc;
     data_pkt->h.crc = 0;
@@ -341,7 +342,7 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
     if(pkt_crc != new_crc)
     {
         LOG_ERROR ("Invalid OTA data packet CRC, calculated crc=%x, expected crc=%x", new_crc, pkt_crc);
-        goto ERR_EXIT;
+        return SBV_ERROR;
     }
 
     ret = sbv_ota_seq_num_validate (seq_num, data_pkt->h.seq_num, data_pkt->h.length);
@@ -351,9 +352,6 @@ sbv_ota_msg_rx_data_packet_validate (sbv_ota_data_pkt_t* data_pkt, uint16_t pkt_
     }
 
     return SBV_OK;
-
-ERR_EXIT:
-    return -1;
 }
 
 int
@@ -363,7 +361,7 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
     uint32_t pkt_crc, new_crc;
 
     if (! resp_pkt)
-        return -1;
+        return SBV_ERROR;
 
     pkt_crc         = resp_pkt->h.crc;
     resp_pkt->h.crc = 0;
@@ -383,7 +381,7 @@ sbv_ota_msg_rx_resp_packet_validate (sbv_ota_resp_pkt_t* resp_pkt, uint16_t* seq
     return 0;
 
 ERR_EXIT:
-    return -1;
+    return SBV_ERROR;
 }
 
 int
@@ -394,7 +392,7 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
     uint32_t pkt_crc, new_crc;
 
     if (! report_pkt)
-        return -1;
+        return SBV_ERROR;
 
     pkt_crc            = report_pkt->h.crc;
     report_pkt->h.crc  = 0;
@@ -414,34 +412,29 @@ sbv_ota_msg_rx_report_packet_validate (sbv_ota_report_pkt_t* report_pkt, uint16_
     return 0;
 
 ERR_EXIT:
-    return -1;
+    return SBV_ERROR;
 }
 
 int
 sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue,
-                          void *packet, uint8_t rcv_buffer[],
-                          uint16_t buffer_size, int data_size,
-                          uint32_t timeout_ms)
+                          void *packet, int data_size, uint32_t timeout_ms)
 {
     int ret, data_len;
     uint32_t start_tick = sbv_rtos_get_tick();
+    uint32_t spare_tick_till_timeout;
 
-    if (! queue || ! rcv_buffer || buffer_size == 0 || ! data_size || ! packet) {
+    if (! queue || data_size <= 0 || ! packet) {
         LOG_ERROR ("Invalid input, aborting rcv OTA msg");
-        return -1;
+        return SBV_ERROR;
     }
 
-    while ((sbv_rtos_get_tick() - start_tick < sbv_rtos_ms_to_tick(timeout_ms))
+    while (((spare_tick_till_timeout = (sbv_rtos_get_tick() - start_tick)) < sbv_rtos_ms_to_tick(timeout_ms))
             && sbv_cqbuff_get_size (queue) < data_size) {
-        data_len = sbv_ota_rcv_data (queue_instance, rcv_buffer, buffer_size, timeout_ms);
+        data_len = sbv_ota_rcv_data (queue_instance, sbv_cqbuff_head(queue),
+                                    sbv_cqbuff_avail_size(queue),
+                                    sbv_rtos_tick_to_ms(spare_tick_till_timeout));
         if (data_len <= 0) {
             LOG_ERROR ("Failed to receive OTA msg, rcv length=%u", data_len);
-            goto ERR_EXIT;
-        }
-
-        ret = sbv_cqbuff_write (queue, rcv_buffer, data_len);
-        if (ret != data_len) {
-            LOG_ERROR ("Write %u bytes into the circular buffer of OTA msg while expected %u bytes", ret, data_len);
             goto ERR_EXIT;
         }
     }
@@ -462,4 +455,60 @@ sbv_ota_msg_get_rcv_data (void *queue_instance, sbv_cqbuff *queue,
 ERR_EXIT:
     sbv_cqbuff_flush (queue);
     return SBV_ERROR;
+}
+
+int
+sbv_ota_send_resp_with_retry (uint8_t resp_type, uint16_t seq_num,
+                              uint8_t retry_num, uint16_t timeout_ms) {
+    uint8_t i;
+    uint32_t start_tick = sbv_rtos_get_tick();
+    int ret = SBV_OK;
+
+    for (i = 0; i < retry_num && sbv_rtos_get_tick() - start_tick < sbv_rtos_ms_to_tick(timeout_ms); ++i) {
+        ret = sbv_ota_msg_send_resp (resp_type, seq_num, timeout_ms);
+        if (ret == SBV_OK) {
+            break;
+        }
+        LOG_ERROR ("Failed to send response packet to OTA Master FSM");
+    }
+
+    return ret;
+}
+
+int
+sbv_ota_send_report_with_retry (const sbv_ota_upd_status upd_status,
+                                const sbv_ota_fw_metadata_t *fw_metadata,
+                                uint16_t seq_num, uint8_t retry_num, uint16_t timeout_ms) {
+    uint8_t i;
+    uint32_t start_tick = sbv_rtos_get_tick();
+    int ret = SBV_OK;
+
+    for (i = 0; i < retry_num && sbv_rtos_get_tick() - start_tick < sbv_rtos_ms_to_tick(timeout_ms); ++i) {
+        ret = sbv_ota_msg_send_report (upd_status, seq_num, fw_metadata, timeout_ms);
+        if (ret == SBV_OK) {
+            break;
+        }
+        LOG_ERROR ("Failed to send report packet to OTA Master FSM");
+    }
+
+    return ret;
+}
+
+char *
+sbv_ota_msg_type_to_str (uint8_t packet_type) {
+    switch (packet_type)
+    {
+    case SBV_OTA_PACKET_TYPE_CMD:
+        return "Command";
+    case SBV_OTA_PACKET_TYPE_HEADER:
+        return "Header";
+    case SBV_OTA_PACKET_TYPE_DATA:
+        return "Data";
+    case SBV_OTA_PACKET_TYPE_RESPONSE:
+        return "Response";
+    case SBV_OTA_PACKET_TYPE_REPORT:
+        return "Report";
+    default:
+        return "";
+    }
 }

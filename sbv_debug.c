@@ -36,7 +36,7 @@ uint8_t
 sbv_debug_set_uart_interface (sbv_uart_instance_t *uart_instance)
 {
     if (! uart_instance)
-        return -1;
+        return SBV_ERROR;
 
     sbv_debug_interface.uart_instance = uart_instance;
 
@@ -82,7 +82,7 @@ sbv_debug_break_command(char* rcv_buffer, uint16_t size)
     char *saveptr;
 
     if(!rcv_buffer || size == 0)
-        return -1;
+        return SBV_ERROR;
 
     max_idx = sizeof(rcv_command) / sizeof(rcv_command[0]);
     memset(rcv_command, 0, sizeof(rcv_command));
@@ -95,7 +95,7 @@ sbv_debug_break_command(char* rcv_buffer, uint16_t size)
         {
             LOG_ERROR ("Debug command length %d is larger then maximum allowable length per slot %d",
                        strlen(token), SBV_DEBUG_MAX_LEN_PER_SLOT);
-            return -1;
+            return SBV_ERROR;
         }
         strcpy(rcv_command[i], token);
         rcv_command[i][SBV_DEBUG_MAX_LEN_PER_SLOT] = '\0';
@@ -115,7 +115,7 @@ sbv_debug_command_handle(uint8_t* rcv_buffer, const uint16_t size)
     uint8_t first_command, command_size;
 
     if(!rcv_buffer || size == 0)
-        return -1;
+        return SBV_ERROR;
 
     command_size = (size < SBV_DEBUG_COMMAND_MAX_LEN) ? size : SBV_DEBUG_COMMAND_MAX_LEN;
     memcpy(rx_command_buffer, rcv_buffer, command_size);
@@ -124,19 +124,19 @@ sbv_debug_command_handle(uint8_t* rcv_buffer, const uint16_t size)
     command_size = sbv_debug_strip_line_ending(rx_command_buffer, command_size);
     if (command_size == 0) {
         LOG_WARN ("Debug command size is 0 after strip line ending");
-        return -1;
+        return SBV_ERROR;
     }
 
     if (sbv_debug_break_command(rx_command_buffer, command_size) != SBV_OK)
     {
         sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
-        return -1;
+        return SBV_ERROR;
     }
 
     if((strlen(rcv_command[0]) != 1) || (strlen(rcv_command[1]) != 1))
     {
         sbv_tx_debug_command = SBV_DEBUG_TX_NONE;
-        return -1;
+        return SBV_ERROR;
     }
 
     first_command = rcv_command[0][0];

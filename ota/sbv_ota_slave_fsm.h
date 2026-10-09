@@ -19,8 +19,8 @@ typedef struct sbv_ota_msg_slave_handler_t
   uint16_t                  seq_num;
   uint16_t                  peer_seq_num;
 
-  sbv_rtos_queue_handle_t   slave_rx_installer_tx_queue;
-  sbv_rtos_queue_handle_t   slave_tx_installer_rx_queue;
+  sbv_rtos_queue_handle_t   rx_queue;
+  sbv_rtos_queue_handle_t   tx_queue;
 } sbv_ota_msg_slave_handler_t;
 
 void

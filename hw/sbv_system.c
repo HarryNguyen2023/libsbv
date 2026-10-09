@@ -22,7 +22,7 @@ sbv_system_get_uid (uint32_t uid[]) {
         return (sbv_system_hw_cb.sbv_system_get_uid) (uid);
     }
 
-    return -1;
+    return SBV_ERROR;
 }
 
 void

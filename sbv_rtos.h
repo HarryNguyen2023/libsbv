@@ -30,9 +30,11 @@
 #define STACK_SIZE_BASE         256
 
 #define sbv_rtos_ms_to_tick     pdMS_TO_TICKS
+#define sbv_rtos_tick_to_ms     pdTICKS_TO_MS
 #define SBV_RTOS_MAX_DELAY      portMAX_DELAY
 #define SBV_RTOS_FALSE          pdFALSE
 #define SBV_RTOS_TRUE           pdTRUE
+#define SBV_RTOS_MAX_DELAY_MS   (UINT32_MAX)
 
 typedef StackType_t             sbv_rtos_stack_type_t;
 typedef SemaphoreHandle_t       sbv_rtos_mutex_t;
@@ -78,8 +80,11 @@ typedef StaticTask_t            sbv_rtos_static_task_t;
 #define sbv_rtos_port_yield_fromISR(H)  \
         portYIELD_FROM_ISR(H)
 
-#define sbv_rtos_task_create(Function, Name, Stack_depth, Param, Priority, Stack_buffer, TaskHandle)  \
+#define sbv_rtos_task_create_static(Function, Name, Stack_depth, Param, Priority, Stack_buffer, TaskHandle)  \
         xTaskCreateStatic(Function, Name, Stack_depth, Param, Priority, Stack_buffer, TaskHandle)
+
+#define sbv_rtos_task_create(Function, Name, Stack_depth, Param, Priority, TaskHandle) \
+        xTaskCreate(Function, Name, Stack_depth, Param, Priority, TaskHandle)
 
 #define sbv_rtos_task_delete(Task_handle)  \
         vTaskDelete(Task_handle)

@@ -95,7 +95,7 @@ sbv_default_init_task (void *param) {
 void
 sbv_init(void)
 {
-    xTaskCreate(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
+    sbv_rtos_task_create(sbv_default_init_task, "Starter", STACK_SIZE_BASE, NULL, 4, &sbv_default_init_handle);
 
     sbv_rtos_start_task_scheduler();
 }
@@ -116,10 +116,10 @@ sbv_task_init(void)
 {
     LOG_INFO ("SBV system starting up... !");
 
-    sbv_rtos_task_create(sbv_task_debug_console_task, "debug", STACK_SIZE_BASE,
+    sbv_rtos_task_create_static(sbv_task_debug_console_task, "debug", STACK_SIZE_BASE,
                         NULL, 2, debug_stack, &sbv_debug_handle);
 #ifdef STM32F1xx
-    sbv_rtos_task_create(sbv_task_balance_control, "balance_ctrl", STACK_SIZE_BASE * 4,
+    sbv_rtos_task_create_static(sbv_task_balance_control, "balance_ctrl", STACK_SIZE_BASE * 4,
                         NULL, 4, balance_crtl_stack, &sbv_balance_ctrl_handle);
 #endif /* STM32F1xx */
     LOG_INFO ("SBV system has finished inialization!");
@@ -201,7 +201,7 @@ void
 sbv_task_ota_init (uint8_t is_master) {
     int ret;
 
-    ret = sbv_ota_ipc_queue_init (&sbv_ota_queue, is_master);
+    ret = sbv_ota_ipc_queue_init (&sbv_ota_queues, is_master);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to initiate IPC queue for OTA tasks");
         return;
@@ -211,7 +211,7 @@ sbv_task_ota_init (uint8_t is_master) {
     sbv_ota_slave_fsm_init (&sbv_ota_queues);
 
     if (is_master) {
-        sbv_ota_master_fsm_init ();
+        sbv_ota_master_fsm_init (&sbv_ota_queues);
     }
 }
 #endif /* ESP32xx_IDF */

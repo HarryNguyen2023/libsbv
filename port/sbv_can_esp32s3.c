@@ -29,7 +29,7 @@ sbv_can_esp32s3_init(sbv_can_instance_t *can_instance,
                      void *can_handle)
 {
     /*Intiiate CAN_RX filtering*/
-    sbv_can_esp32s3_filter_init();
+    // sbv_can_esp32s3_filter_init();
 
     memset (can_instance, 0, sizeof (sbv_can_instance_t));
     can_instance->can_rcv_buf = sbv_cqbuff_create(SBV_CAN_RCV_BUFFER_SIZE, 1);
@@ -186,7 +186,7 @@ sbv_can_esp32s3_rcv_data (sbv_can_instance_t *can_instance,
         LOG_ERROR ("Failed to rcv CAN data, ret=%d", ret);
         return 0;
     }
-    
+
     if (can_instance->can_rcv_buf)
     {
         sbv_cqbuff_write (can_instance->can_rcv_buf,
