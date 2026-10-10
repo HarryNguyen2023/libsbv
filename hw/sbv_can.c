@@ -34,7 +34,7 @@ sbv_can_send_data(sbv_can_instance_t *can_instance,
     if (sbv_can_hw_cb.sbv_can_send_data)
         return (sbv_can_hw_cb.sbv_can_send_data) (can_instance, msg_type, data, length);
 
-    return 0;
+    return SBV_ERROR;
 }
 
 uint16_t

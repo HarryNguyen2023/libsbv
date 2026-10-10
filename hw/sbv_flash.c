@@ -18,7 +18,7 @@ sbv_flash_erase_page(uint32_t page_addr, uint16_t pages_num)
         return (sbv_flash_hw_cb.sbv_flash_erase_page) (page_addr, pages_num);
     }
 
-    return 0;
+    return SBV_ERROR;
 }
 
 int
@@ -28,5 +28,5 @@ sbv_flash_write_page (uint8_t *data, uint32_t data_length, uint32_t page_addr)
         return (sbv_flash_hw_cb.sbv_flash_write_page) (data, data_length, page_addr);
     }
 
-    return 0;
+    return SBV_ERROR;
 }
