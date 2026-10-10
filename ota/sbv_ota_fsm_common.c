@@ -35,7 +35,7 @@ sbv_ota_fsm_state_to_string (sbv_ota_state_t state) {
 }
 
 int
-sbv_ota_fsm_handle_state (struct sbv_ota_fsm_cb_t **state_table, 
+sbv_ota_fsm_handle_state (struct sbv_ota_fsm_cb_t state_table[][SBV_OTA_STATE_MAX], 
                           sbv_ota_state_t current_state, sbv_ota_state_t next_state, void *data)
 {
     struct sbv_ota_fsm_cb_t *state_cb;
@@ -45,7 +45,7 @@ sbv_ota_fsm_handle_state (struct sbv_ota_fsm_cb_t **state_table,
         return SBV_ERROR;
 
     state_cb = (*(state_table + current_state)) + next_state;
-    if (! state_cb)
+    if (! state_cb || ! (state_cb->state_func))
     {
         LOG_ERROR ("FSM transit state cb function is nil, current state=%s, next state=%s",
                     sbv_ota_fsm_state_to_string(current_state),
