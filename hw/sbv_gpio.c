@@ -11,7 +11,7 @@ struct sbv_gpio_hw_cb sbv_gpio_hw =
     .sbv_gpio_toggle_pin = sbv_gpio_stm32f1xx_toggle_pin
 #elif defined ESP32xx_IDF
     .sbv_gpio_init       = sbv_gpio_esp32s3_init,
-    .sbv_gpio_read_pin   = sbv_gpio_esp32s3_set_pin_level,
+    .sbv_gpio_set_pin    = sbv_gpio_esp32s3_set_pin_level,
     .sbv_gpio_read_pin   = sbv_gpio_esp32s3_read_pin,
     .sbv_gpio_toggle_pin = sbv_gpio_esp32s3_toggle_pin
 #endif /* STM32F1xx */
