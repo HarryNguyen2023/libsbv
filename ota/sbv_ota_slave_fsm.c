@@ -263,7 +263,7 @@ sbv_ota_slave_fsm_start (sbv_ota_state_t current_state, void *data)
     }
 
     ret = sbv_ota_msg_fsm_handle_cmd(sbv_ota_msg_slave_handler.data_queue,
-                                     sbv_ota_msg_slave_handler.peer_seq_num,
+                                     &(sbv_ota_msg_slave_handler.peer_seq_num),
                                      SBV_OTA_CMD_START, SBV_RTOS_MAX_DELAY_MS);
     if (ret != SBV_OK) {
         LOG_ERROR ("Failed to handle cmd start packet, sending NACK to OTA Master FSM");
@@ -307,7 +307,7 @@ sbv_ota_slave_fsm_header (sbv_ota_state_t current_state, void *data)
     }
 
     ret = sbv_ota_msg_fsm_handle_header(sbv_ota_msg_slave_handler.data_queue,
-                                        sbv_ota_msg_slave_handler.peer_seq_num,
+                                        &(sbv_ota_msg_slave_handler.peer_seq_num),
                                         SBV_RTOS_MAX_DELAY_MS,
                                         &(sbv_ota_msg_slave_handler.new_fw_metadata));
     if (ret != SBV_OK) {
@@ -359,7 +359,7 @@ sbv_ota_slave_fsm_data (sbv_ota_state_t current_state, void *data)
         fw_image_head = sbv_ota_msg_slave_handler.fw_image +  \
                             sbv_ota_msg_slave_handler.current_rcv_image_size;
         ret = sbv_ota_msg_fsm_handle_data(sbv_ota_msg_slave_handler.data_queue,
-                                          sbv_ota_msg_slave_handler.peer_seq_num,
+                                          &(sbv_ota_msg_slave_handler.peer_seq_num),
                                           SBV_RTOS_MAX_DELAY_MS, fw_image_head,
                                           sbv_ota_msg_slave_handler.current_rcv_image_size,
                                           sbv_ota_msg_slave_handler.new_fw_metadata.fw_size);
@@ -417,7 +417,7 @@ sbv_ota_slave_fsm_end (sbv_ota_state_t current_state, void *data)
     }
 
     ret = sbv_ota_msg_fsm_handle_cmd(sbv_ota_msg_slave_handler.data_queue,
-                                     sbv_ota_msg_slave_handler.peer_seq_num,
+                                     &(sbv_ota_msg_slave_handler.peer_seq_num),
                                      SBV_OTA_CMD_END, SBV_RTOS_MAX_DELAY_MS);
     if (ret != SBV_OK) {
         if (ret == SVB_OTA_SEQ_DUP) {
